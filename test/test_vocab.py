@@ -1,55 +1,14 @@
-import pytest
-from src.vocab import Vocab, IllegalArgumentError, UNK
-
-# # * Tests voor Tokenizer
-# # * Word Tokenizer
-# words_sentence = "Dit is een test 123"
-# words_sentence_list = ["Dit", "is", "een", "test", "123"]
-# words_sentence_list_lower = ["dit", "is", "een", "test", "123"]
-
-# words_numbered_sentence_list = [1, 2, 3, 4, 5]
-# words_encoder = {"Dit": 1, "is": 2, "een": 3, "test": 4, "123": 5}
-# words_decoder = {value: key for key, value in words_encoder.items()}
-
-
-# def test_word_tokenizer():
-#     tokenizer = word_tokenizer_factory(lower=False)
-#     assert tokenizer.tokenize(words_sentence) == words_sentence_list
-#     assert tokenizer.encode(words_sentence, words_encoder) == words_numbered_sentence_list
-#     assert tokenizer.decode(words_numbered_sentence_list, words_decoder) == words_sentence
-#     assert tokenizer.decode(tokenizer.encode(words_sentence, words_encoder), words_decoder) == words_sentence
-
-#     tokenizer = word_tokenizer_factory(lower=True)
-#     assert tokenizer.tokenize(words_sentence) == words_sentence_list_lower
-
-
-# characters_sentence = "ABcd 123@%&"
-# characters_sentence_list = ["A", "B", "c", "d", " ", "1", "2", "3", "@", "%", "&"]
-# characters_sentence_list_lower = ["a", "b", "c", "d", " ", "1", "2", "3", "@", "%", "&"]
-
-# characters_numbered_sentence_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-# characters_encoder = {"A":1 , "B":2, "c":3, "d":4, " ": 5, "1": 6, "2": 7, "3": 8, "@": 9, "%": 10, "&": 11}
-# characters_decoder = {value: key for key, value in characters_encoder.items()}
-
-# def test_characters_tokenizer():
-#     tokenizer = character_tokenizer_factory(lower=False)
-#     assert tokenizer.tokenize(characters_sentence) == characters_sentence_list
-#     assert tokenizer.encode(characters_sentence, characters_encoder) == characters_numbered_sentence_list
-#     assert tokenizer.decode(characters_numbered_sentence_list, characters_decoder) == characters_sentence
-#     assert tokenizer.decode(tokenizer.encode(characters_sentence, characters_encoder), characters_decoder) == characters_sentence
-
-#     tokenizer = character_tokenizer_factory(lower=True)
-#     assert tokenizer.tokenize(characters_sentence) == characters_sentence_list_lower
 
 # * Tests met hypothesis
 
 import re
 import string
+from pytest import raises
 from typing import Callable
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, lists, text, sampled_from, booleans
 
-from src.vocab import tokenizer_options
+from src.vocab import Vocab, IllegalArgumentError, UNK, tokenizer_options
 
 tokenizer_methods = list(tokenizer_options.keys())
 
@@ -105,7 +64,7 @@ def test_tokenizer(method: str, lower: bool, sentence: str):
         method=text().filter(lambda s: s not in tokenizer_methods) # however unlikely, I don't want to randomly generate a valid method
         )
 def test_raises_exception(sentences, method):
-    with pytest.raises(IllegalArgumentError):
+    with raises(IllegalArgumentError):
         Vocab(sentences, tokenize_method=method)
 
 @given(
