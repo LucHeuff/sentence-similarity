@@ -15,12 +15,12 @@ tokenizer_methods = list(tokenizer_options.keys())
 alphabet = string.ascii_letters + string.digits + string.punctuation # allowing everything but spaces since those are a token splitting condition
 
 @composite
-def sentence(draw: Callable[[SearchStrategy[list[str]]], str]) -> str:
+def sentence(draw) -> str:
     words = draw(lists(text(alphabet, min_size=1, max_size=10))) # not allowed to be empty, I'm just assuming sentences are never empty
     return " ".join(words)
 
 @composite
-def sentences(draw: Callable[[SearchStrategy[list[str]]], list[str]]) -> list[str]:
+def sentences(draw) -> list[str]:
     sentences = draw(lists(sentence()))
     return [sentence for sentence in sentences if not sentence == ''] # really making sure hypothesis does not keep sneakering empty sentences past me
 
