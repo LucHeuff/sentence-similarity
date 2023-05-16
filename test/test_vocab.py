@@ -57,7 +57,7 @@ def test_tokenizer(method: str, lower: bool, sentence: str):
     assert tokenizer.decode(numbered_tokens, decoder) == sentence
     assert tokenizer.decode(tokenizer.encode(sentence, encoder), decoder) == sentence
 
-# * Tests voor Vocab
+# * Testing Vocab
 
 @given(
         sentences=sentences(), 
