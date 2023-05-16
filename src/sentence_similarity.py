@@ -25,6 +25,8 @@ def sentence_similarity(
                           scale_by_length=scale_by_length)
     one_hot_encode = partial(_one_hot_sentence, **one_hot_kwargs)
     one_hot_sentences = [one_hot_encode(sentence) for sentence in num_sentences]
+    
+    one_hot_tensor = np.stack(one_hot_sentences)
 
     pass
 
@@ -58,3 +60,17 @@ def _one_hot_sentence(
         one_hot = one_hot * 1/len(sentence)
 
     return one_hot
+
+def _weight_matrix(size: int, min: float=0.5) -> np.ndarray:
+
+    if min >= 1.0:
+        raise ValueError(f"You are trying to set a minimum value of {min}, which is higher or equal to 1. The weight matrix was not designed with this in mind")
+
+    size_range = np.arange(size)
+    linear_space = np.linspace(1, min, num=size)
+
+    weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))
+    weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
+    
+    return weight_matrix
+

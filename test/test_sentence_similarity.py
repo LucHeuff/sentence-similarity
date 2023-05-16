@@ -1,12 +1,12 @@
 import hypothesis
 import string
 import numpy as np
-from hypothesis import given, assume
-from hypothesis.strategies import SearchStrategy, composite, lists, text, integers, sampled_from, booleans
-from pytest import approx
+from hypothesis import given
+from hypothesis.strategies import SearchStrategy, composite, lists, text, integers, floats, sampled_from, booleans
+from pytest import approx, raises
 from typing import Callable
 
-from src.sentence_similarity import _numericalize, _one_hot_sentence
+from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix
 from src.vocab import Vocab, tokenizer_options
 
 # hypothesis.settings(deadline=1000) # attempt to avoid flaky tests
@@ -32,13 +32,6 @@ def sentences(draw) -> list[str]:
 @composite
 def numbered_sentences(draw) -> list[np.ndarray]:
     return draw(lists(numbered_sentence(), min_size=1))
-
-# def tokenize_words(sentence: str) -> list[str]:
-#     return sentence.split()
-
-# def tokenize_characters(sentence: str) -> list[str]:
-#     return list(sentence)
-
 
 # * Testing separate methods
 @given(
@@ -72,3 +65,23 @@ def test_one_hot_sentence(num_sentence: np.ndarray, term_frequency: bool, scale_
         assert encoded.sum() == np.unique(num_sentence).size
     if term_frequency and scale_by_length:
         assert encoded.sum() == approx(np.unique(num_sentence).size / num_sentence.size)
+
+@given(
+    size=integers(min_value=2, max_value=10),
+    min=floats(min_value=0, max_value=0.999)
+)
+def test_weight_matrix(size: int, min: float):
+    weight_matrix = _weight_matrix(size, min)
+
+    assert weight_matrix.shape == (size, size)
+    assert weight_matrix.max() == 1.
+    assert weight_matrix.min() == min
+    assert np.array_equal(weight_matrix.T, weight_matrix)
+
+@given(
+    size=integers(min_value=2, max_value=10),
+    min=floats(min_value=1)
+)
+def test_weight_matrix_exception(size: int, min: float):
+    with raises(ValueError):
+        _weight_matrix(size, min)
