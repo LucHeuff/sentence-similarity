@@ -85,3 +85,20 @@ def test_weight_matrix(size: int, min: float):
 def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
         _weight_matrix(size, min)
+# * somewhat more of an integeration test but generating the right tensors is really annoying
+@given(
+        sentences=numbered_sentences(vocab_length=25, sentence_length=20)
+        )
+def test_einsum(sentences: list[np.ndarray]):
+    vocab_length = 25 + 1 # adding 1 for the unknown token
+    sentence_length = 20
+
+    one_hot_sentences = [_one_hot_sentence(sentence, vocab_length, sentence_length) for sentence in sentences]
+    tensor = np.stack(one_hot_sentences)
+    weight_matrix = _weight_matrix(size=20, min=0.2)
+
+    einsum = _einsum(tensor, weight_matrix)
+
+    n = len(sentences)
+    assert einsum.shape == (n, n)
+    assert all(np.diag(einsum))

@@ -72,5 +72,17 @@ def _weight_matrix(size: int, min: float=0.5) -> np.ndarray:
     weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
     
-    return weight_matrix
+def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
+    # einsum to calculate the similarity scores for all sentences amongst each other
+    similarity = np.einsum("mij, nik, jk -> mn", tensor, tensor, weight_matrix, optimize="optimal")
 
+    # scaling down columnwise by diagonal, this should result in scoring in a column being relative to the sentence itself
+    similarity = np.einsum("ij, j -> ij", similarity, 1 / np.diag(similarity), optimize="optimal")
+
+    # TODO why was this necessary? -> try without first
+    # taking lower triangle, as similarity should logically be symmetric
+    # similarity = np.tril(similarity) + np.tril(similarity).T - np.diag(np.diag(similarity))
+
+    return similarity
+
+    # TODO add scaling down cases where similarity larger than 1 through 1 - ([sim>1] - 1) before dividing by diagonal -> in the pandas conversion!
