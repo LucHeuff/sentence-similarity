@@ -77,18 +77,27 @@ def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
         _weight_matrix(size, min)
 
-# TODO instead of fixing sentence and vocab lengths, use one of those recursive strategy things?
+
+
+# * Testing einsum
+@composite
+def einsum_data(draw) -> tuple[list[np.ndarray], int, int]:
+    vocab_length = draw(integers(min_value=1, max_value=30))
+    sentence_length = draw(integers(min_value=2, max_value=30))
+    sentences = draw(numbered_sentences(vocab_length, sentence_length))
+    assume(sentences != [])
+    return sentences, vocab_length, sentence_length
+
+
 # * somewhat more of an integeration test but generating the right tensors is really annoying
-@given(
-        sentences=numbered_sentences(vocab_length=25, sentence_length=20)
-        )
-def test_einsum(sentences: list[np.ndarray]):
-    vocab_length = 25 + 1 # adding 1 for the unknown token
-    sentence_length = 20
+@given(einsum_data())
+def test_einsum(data: tuple[list[np.ndarray], int, int]):
+    sentences, vocab_length, sentence_length = data
+    vocab_length += 1 # adding 1 for the unknown token
 
     one_hot_sentences = [_one_hot_sentence(sentence, vocab_length, sentence_length) for sentence in sentences]
     tensor = np.stack(one_hot_sentences)
-    weight_matrix = _weight_matrix(size=20, min=0.2)
+    weight_matrix = _weight_matrix(size=sentence_length, min=0.2)
 
     einsum = _einsum(tensor, weight_matrix)
 
