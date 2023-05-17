@@ -6,7 +6,7 @@ from hypothesis.strategies import SearchStrategy, composite, lists, text, intege
 from pytest import approx, raises
 from typing import Callable
 
-from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix
+from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum
 from src.vocab import Vocab, tokenizer_options
 
 # hypothesis.settings(deadline=1000) # attempt to avoid flaky tests
@@ -20,8 +20,8 @@ def sentence(draw) -> str:
     return " ".join(words)
 
 @composite
-def numbered_sentence(draw, min_size: int=1, max_size: int=20) -> np.ndarray:
-    nums = draw(lists(integers(min_value=1, max_value=25), min_size=min_size, max_size=max_size)) # max value should not be too high for flaky tests
+def numbered_sentence(draw, min_size: int=1, max_size: int=20, vocab_length: int=25) -> np.ndarray:
+    nums = draw(lists(integers(min_value=1, max_value=vocab_length), min_size=min_size, max_size=max_size)) # max value should not be too high for flaky tests
     return np.asarray(nums)
 
 @composite
@@ -30,8 +30,9 @@ def sentences(draw) -> list[str]:
     return [sentence for sentence in sentences if not sentence == ''] # really making sure hypothesis does not keep sneakering empty sentences past me
 
 @composite
-def numbered_sentences(draw) -> list[np.ndarray]:
-    return draw(lists(numbered_sentence(), min_size=1))
+def numbered_sentences(draw, vocab_length: int=25, sentence_length: int=20) -> list[np.ndarray]:
+    size = sentence_length
+    return draw(lists(numbered_sentence(min_size=size, max_size=size, vocab_length=vocab_length), min_size=3))
 
 # * Testing separate methods
 @given(
@@ -47,28 +48,20 @@ def test_numericalize(sentences, method, lower):
 
 @given(
         num_sentence=numbered_sentence(),
-        term_frequency=booleans(),
-        scale_by_length=booleans()
        )
-def test_one_hot_sentence(num_sentence: np.ndarray, term_frequency: bool, scale_by_length: bool):
+def test_one_hot_sentence(num_sentence: np.ndarray):
     vocab_length = num_sentence.max() + 1 # * adding one because vocab will always have <unk> added
     max_sentence_length = num_sentence.size
 
-    encoded = _one_hot_sentence(num_sentence, vocab_length, max_sentence_length, term_frequency, scale_by_length)
+    encoded = _one_hot_sentence(num_sentence, vocab_length, max_sentence_length)
 
     assert encoded.shape == (vocab_length, max_sentence_length)
     assert np.array_equal(num_sentence, encoded.argmax(axis=0))
 
-    if not term_frequency and not scale_by_length:
-        assert encoded.sum() == max_sentence_length
-    if term_frequency and not scale_by_length:
-        assert encoded.sum() == np.unique(num_sentence).size
-    if term_frequency and scale_by_length:
-        assert encoded.sum() == approx(np.unique(num_sentence).size / num_sentence.size)
 
 @given(
     size=integers(min_value=2, max_value=10),
-    min=floats(min_value=0, max_value=0.999)
+    min=floats(min_value=0, max_value=0.9990234375, width=16) #* operating on 16 bit floats
 )
 def test_weight_matrix(size: int, min: float):
     weight_matrix = _weight_matrix(size, min)
@@ -78,6 +71,7 @@ def test_weight_matrix(size: int, min: float):
     assert weight_matrix.min() == min
     assert np.array_equal(weight_matrix.T, weight_matrix)
 
+
 @given(
     size=integers(min_value=2, max_value=10),
     min=floats(min_value=1)
@@ -85,6 +79,8 @@ def test_weight_matrix(size: int, min: float):
 def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
         _weight_matrix(size, min)
+
+
 # * somewhat more of an integeration test but generating the right tensors is really annoying
 @given(
         sentences=numbered_sentences(vocab_length=25, sentence_length=20)
