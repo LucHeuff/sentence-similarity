@@ -1,12 +1,8 @@
-
-# * Tests met hypothesis
-
 import re
 import string
 from pytest import raises
-from typing import Callable
 from hypothesis import given
-from hypothesis.strategies import SearchStrategy, composite, lists, text, sampled_from, booleans
+from hypothesis.strategies import composite, lists, text, sampled_from, booleans
 
 from src.vocab import Vocab, IllegalArgumentError, UNK, tokenizer_options
 

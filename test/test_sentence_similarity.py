@@ -1,10 +1,8 @@
-import hypothesis
-import string
 import numpy as np
 from hypothesis import given
-from hypothesis.strategies import SearchStrategy, composite, lists, text, integers, floats, sampled_from, booleans
-from pytest import approx, raises
-from typing import Callable
+from hypothesis.strategies import composite, lists, text, integers, floats, sampled_from, booleans
+from pytest import raises
+from string import printable
 
 from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum
 from src.vocab import Vocab, tokenizer_options
@@ -12,11 +10,10 @@ from src.vocab import Vocab, tokenizer_options
 # hypothesis.settings(deadline=1000) # attempt to avoid flaky tests
 
 tokenizer_methods = list(tokenizer_options.keys())
-alphabet = string.ascii_letters + string.digits + string.punctuation # allowing everything but spaces since those are a token splitting condition
 
 @composite
 def sentence(draw) -> str:
-    words = draw(lists(text(alphabet, min_size=1, max_size=10))) # not allowed to be empty, I'm just assuming sentences are never empty
+    words = draw(lists(text(printable, min_size=1, max_size=10))) # not allowed to be empty, I'm just assuming sentences are never empty
     return " ".join(words)
 
 @composite
@@ -80,7 +77,7 @@ def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
         _weight_matrix(size, min)
 
-
+# TODO instead of fixing sentence and vocab lengths, use one of those recursive strategy things?
 # * somewhat more of an integeration test but generating the right tensors is really annoying
 @given(
         sentences=numbered_sentences(vocab_length=25, sentence_length=20)
