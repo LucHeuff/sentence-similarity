@@ -1,5 +1,5 @@
 import numpy as np
-from hypothesis import given
+from hypothesis import given, assume
 from hypothesis.strategies import composite, lists, text, integers, floats, sampled_from, booleans
 from pytest import raises
 from string import printable
@@ -7,9 +7,10 @@ from string import printable
 from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum
 from src.vocab import Vocab, tokenizer_options
 
-# hypothesis.settings(deadline=1000) # attempt to avoid flaky tests
-
 tokenizer_methods = list(tokenizer_options.keys())
+
+
+# * Testing numericalization
 
 @composite
 def sentence(draw) -> str:
@@ -17,21 +18,11 @@ def sentence(draw) -> str:
     return " ".join(words)
 
 @composite
-def numbered_sentence(draw, min_size: int=1, max_size: int=20, vocab_length: int=25) -> np.ndarray:
-    nums = draw(lists(integers(min_value=1, max_value=vocab_length), min_size=min_size, max_size=max_size)) # max value should not be too high for flaky tests
-    return np.asarray(nums)
-
-@composite
 def sentences(draw) -> list[str]:
     sentences = draw(lists(sentence()))
     return [sentence for sentence in sentences if not sentence == ''] # really making sure hypothesis does not keep sneakering empty sentences past me
 
-@composite
-def numbered_sentences(draw, vocab_length: int=25, sentence_length: int=20) -> list[np.ndarray]:
-    size = sentence_length
-    return draw(lists(numbered_sentence(min_size=size, max_size=size, vocab_length=vocab_length), min_size=3))
 
-# * Testing separate methods
 @given(
         sentences=sentences(),
         method=sampled_from(tokenizer_methods),
@@ -42,6 +33,19 @@ def test_numericalize(sentences, method, lower):
     numericalized = _numericalize(sentences, vocab)
     assert all(isinstance(sentence, np.ndarray) for sentence in numericalized)
     assert len(numericalized) == len(sentences)
+
+# * Testing one-hot encoding
+
+@composite
+def numbered_sentence(draw, min_size: int=1, max_size: int=20, vocab_length: int=25) -> np.ndarray:
+    nums = draw(lists(integers(min_value=1, max_value=vocab_length), min_size=min_size, max_size=max_size)) # max value should not be too high for flaky tests
+    return np.asarray(nums)
+
+@composite
+def numbered_sentences(draw, vocab_length: int=25, sentence_length: int=20) -> list[np.ndarray]:
+    size = sentence_length
+    return draw(lists(numbered_sentence(min_size=size, max_size=size, vocab_length=vocab_length), min_size=2))
+
 
 @given(
         num_sentence=numbered_sentence(),
@@ -55,6 +59,7 @@ def test_one_hot_sentence(num_sentence: np.ndarray):
     assert encoded.shape == (vocab_length, max_sentence_length)
     assert np.array_equal(num_sentence, encoded.argmax(axis=0))
 
+# * Testing weight matrix
 
 @given(
     size=integers(min_value=2, max_value=10),
@@ -67,7 +72,6 @@ def test_weight_matrix(size: int, min: float):
     assert weight_matrix.max() == 1.
     assert weight_matrix.min() == min
     assert np.array_equal(weight_matrix.T, weight_matrix)
-
 
 @given(
     size=integers(min_value=2, max_value=10),
