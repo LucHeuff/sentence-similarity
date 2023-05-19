@@ -89,5 +89,3 @@ def _to_dataframe(sentences: list[str], similarity: np.ndarray) -> pd.DataFrame:
           .rename(columns=new_names)
           )
     return df
-
-    # TODO add scaling down cases where similarity larger than 1 through 1 - ([sim>1] - 1) before dividing by diagonal -> in the pandas conversion!
