@@ -1,15 +1,13 @@
 import itertools
+import string
 import numpy as np
 from hypothesis import given, assume
 from hypothesis.strategies import composite, lists, text, integers, floats, sampled_from, booleans
 from hypothesis.extra.numpy import arrays
 from pytest import raises
-from string import printable
 
 from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe, sentence_similarity
 from src.vocab import Vocab, tokenizer_options
-
-
 
 tokenizer_methods = list(tokenizer_options.keys())
 
@@ -19,10 +17,17 @@ SENTENCE_LENGTH = 10
 
 
 # * Testing numericalization
+alphabet = string.ascii_letters + string.digits + string.punctuation
+
+@composite
+def word(draw) -> str:
+    word = draw(text(alphabet, min_size=1, max_size=WORD_LENGTH))
+    assume(word != " ") # words are not allowed to be spaces 
+    return word
 
 @composite
 def sentence(draw) -> str:
-    words = draw(lists(text(printable, min_size=1, max_size=WORD_LENGTH))) 
+    words = draw(lists(word())) 
     sentence = " ".join(words)
     assume(sentence != "") # not allowed to be empty, I'm just assuming sentences are never empty
     return sentence
