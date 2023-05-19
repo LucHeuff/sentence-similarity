@@ -43,8 +43,6 @@ def _one_hot_sentence(
     one_hot = np.zeros((vocab_length, max_sentence_length))
     # replacing indices given from the numericalised sentences with ones
     one_hot[(sentence, np.arange(len(sentence)))] = 1.
-    # Index 0 indicates that the token was not recognised by the vocabulary. These need to be ignored in the similarity check, so setting the first row to zeros:
-    one_hot[0] = np.zeros((1, max_sentence_length))
 
     # Term frequency is applied to discount words that appear in the sentence more often. 
     # This avoids getting high similarity scores because the same word appears mulitple times in the sentence.
@@ -53,6 +51,7 @@ def _one_hot_sentence(
     inverse_term_frequencies = np.divide(1, np.sqrt(term_frequencies), where=term_frequencies > 0) # avoiding divide by zero error with np.divide(where=...)
     # multiply row by inverse term frequencies
     one_hot = np.einsum("ij, i -> ij", one_hot, inverse_term_frequencies, optimize="optimal")
+    one_hot = np.nan_to_num(one_hot) # making sure there are no nans in my array which seems to happen in testing
 
     return _half_precision(one_hot)  # * using half precision floats to save some space
 
