@@ -58,7 +58,7 @@ def _one_hot_sentence(
 def _weight_matrix(size: int, min: float) -> np.ndarray:
 
     if min >= 1.0:
-        raise ValueError(f"You are trying to set a minimum value of {min}, which is higher or equal to 1. The weight matrix was not designed with this in mind")
+        raise ValueError(f"You are trying to set a minimum value for the weight matrix of {min}, which is higher or equal to 1. The weight matrix was not designed with this in mind")
 
     size_range = np.arange(size)
     linear_space = np.linspace(1, min, num=size)
