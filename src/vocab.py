@@ -4,8 +4,6 @@ from collections import Counter
 from functools import partial
 from typing import Callable
 
-UNK = "<unk>" # unknown token
-
 class IllegalArgumentError(ValueError):
     pass
 
@@ -118,8 +116,7 @@ class Vocab:
         all_sentences = self.combine_sentences(sentences)
         tokens = self.tokenizer.tokenize(all_sentences)
         counter = Counter(tokens)
-        vocab = {token: i for (i, token) in enumerate(counter, start=1)}
-        vocab[UNK] = 0
+        vocab = {token: i for (i, token) in enumerate(counter)}
         return vocab
     
     def _create_decoder(self) -> dict:
@@ -127,7 +124,6 @@ class Vocab:
 
     def encode(self, sentence: str) -> list[int]:
         f"""Encodes a sentence through the vocabulary to a list of integers.
-        Any tokens that are not recognised in the vocabulary will be represented by {UNK}, or 0 after encoding
 
         Args:
             sentence (str): the sentence to be encoded
@@ -139,7 +135,6 @@ class Vocab:
     
     def decode(self, numbered_sentence: list[int]) -> str:
         f"""Decodes a list of integers through the vocabulary to a sentence.
-        Any tokens that were not recognised in the vocabulary, represented by 0, will be represented by {UNK} after decoding
 
         Args:
             numbered_sentence (list[int]): list of integers representing a stence

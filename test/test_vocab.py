@@ -4,7 +4,7 @@ from pytest import raises
 from hypothesis import given
 from hypothesis.strategies import composite, lists, text, sampled_from, booleans
 
-from src.vocab import Vocab, IllegalArgumentError, UNK, tokenizer_options
+from src.vocab import Vocab, IllegalArgumentError, tokenizer_options
 
 tokenizer_methods = list(tokenizer_options.keys())
 
@@ -44,7 +44,7 @@ def test_tokenizer(method: str, lower: bool, sentence: str):
     else: # Note: should run into errors if I add new methods and forget to write test cases for them
         tokens = tokenize_characters(sentence)
     # * automatically creating the encoder and decoder as these are not actually part of the test
-    encoder = {word: i for i, word in enumerate(tokens, start=1)}
+    encoder = {word: i for i, word in enumerate(tokens)}
     decoder = {value: key for key, value in encoder.items()}
     numbered_tokens = [encoder[token] for token in tokens]
 
@@ -83,8 +83,8 @@ def test_vocab(sentences: list[str], method: str, lower: bool):
     else: tokens = tokenize_characters(flat_sentence)
     items = set(tokens)
 
-    assert len(vocab) == len(items) + 1 # UNK is added so should be one longer
-    assert set(vocab.vocab.keys()).difference(items) == set([UNK])
+    assert len(vocab) == len(items)
+    assert set(vocab.vocab.keys()) == items
     for sentence in sentences:
         sentence = sentence.lower() if lower else sentence
         assert vocab.decode(vocab.encode(sentence)) == sentence
