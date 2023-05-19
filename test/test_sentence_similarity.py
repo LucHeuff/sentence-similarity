@@ -6,7 +6,7 @@ from hypothesis.extra.numpy import arrays
 from pytest import raises
 from string import printable
 
-from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe
+from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe, sentence_similarity
 from src.vocab import Vocab, tokenizer_options
 
 
@@ -148,5 +148,15 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray]):
 
 # * integration test of sentence_similarity
 
+@given(
+    sentences=sentences(),
+    tokenize_method=sampled_from(tokenizer_methods),
+    lower=booleans(),
+    weight_matrix_min=floats(min_value=0, max_value=0.999)
+)
+def test_sentence_similarity(sentences: list[str], tokenize_method: str, lower: bool, weight_matrix_min: float):
+    similarity = sentence_similarity(sentences, tokenize_method, lower, weight_matrix_min)
 
-    
+    assert similarity.shape == (len(sentences)**2, 3)
+    assert np.array_equal(similarity.sentence.unique(), similarity.other_sentence.unique())
+    assert np.array_equal(similarity.sentence.unique(), sentences)
