@@ -75,7 +75,7 @@ def test_one_hot_sentence(num_sentence: np.ndarray):
 
 @given(
     size=integers(min_value=2, max_value=10),
-    min=floats(min_value=0, max_value=0.9990234375, width=16) #* operating on 16 bit floats
+    min=floats(min_value=0, max_value=0.99) 
 )
 def test_weight_matrix(size: int, min: float):
     weight_matrix = _weight_matrix(size, min)

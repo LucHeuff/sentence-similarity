@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
+from numba import jit
 from functools import partial
 
 from src.vocab import Vocab
+
+EINSUM_OPT = "optimal"
     
 def sentence_similarity(
         sentences: list[str],
@@ -28,9 +31,6 @@ def sentence_similarity(
 
     return _to_dataframe(sentences, similarity)
 
-def _half_precision(array: np.ndarray) -> np.ndarray:
-    return array.astype(dtype=np.float16)
-
 def _numericalize(sentences: list[str], vocab: Vocab) -> list[np.ndarray]:
     return [np.asarray(vocab.encode(sentence)) for sentence in sentences]
 
@@ -50,10 +50,10 @@ def _one_hot_sentence(
     term_frequencies = one_hot.sum(axis=1) # counting how often each word appears by summing over the columns
     inverse_term_frequencies = np.divide(1, np.sqrt(term_frequencies), where=term_frequencies > 0) # avoiding divide by zero error with np.divide(where=...)
     # multiply row by inverse term frequencies
-    one_hot = np.einsum("ij, i -> ij", one_hot, inverse_term_frequencies, optimize="optimal")
+    one_hot = np.einsum("ij, i -> ij", one_hot, inverse_term_frequencies, optimize=EINSUM_OPT)
     one_hot = np.nan_to_num(one_hot) # making sure there are no nans in my array which seems to happen in testing
 
-    return _half_precision(one_hot)  # * using half precision floats to save some space
+    return one_hot
 
 def _weight_matrix(size: int, min: float) -> np.ndarray:
 
@@ -66,14 +66,14 @@ def _weight_matrix(size: int, min: float) -> np.ndarray:
     weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
     
-    return _half_precision(weight_matrix)
+    return weight_matrix
 
 def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
     # einsum to calculate the similarity scores for all sentences amongst each other
-    similarity = np.einsum("mij, nik, jk -> mn", tensor, tensor, weight_matrix, optimize="optimal")
+    similarity = np.einsum("mij, nik, jk -> mn", tensor, tensor, weight_matrix, optimize=EINSUM_OPT)
 
     # scaling down columnwise by diagonal, this should result in scoring in a column being relative to the sentence itself
-    similarity = np.einsum("ij, j -> ij", similarity, 1 / np.diag(similarity), optimize="optimal")
+    similarity = np.einsum("ij, j -> ij", similarity, 1 / np.diag(similarity), optimize=EINSUM_OPT)
 
     # TODO why was this necessary? -> try without first
     # taking lower triangle, as similarity should logically be symmetric
