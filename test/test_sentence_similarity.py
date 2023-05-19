@@ -9,21 +9,27 @@ from string import printable
 from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe
 from src.vocab import Vocab, tokenizer_options
 
+
+
 tokenizer_methods = list(tokenizer_options.keys())
+
+WORD_LENGTH = 20
+VOCAB_LENGTH = 15
+SENTENCE_LENGTH = 10
 
 
 # * Testing numericalization
 
 @composite
 def sentence(draw) -> str:
-    words = draw(lists(text(printable, min_size=1, max_size=10))) # not allowed to be empty, I'm just assuming sentences are never empty
-    return " ".join(words)
+    words = draw(lists(text(printable, min_size=1, max_size=WORD_LENGTH))) 
+    sentence = " ".join(words)
+    assume(sentence != "") # not allowed to be empty, I'm just assuming sentences are never empty
+    return sentence
 
 @composite
-def sentences(draw) -> list[str]:
-    sentences = draw(lists(sentence()))
-    return [sentence for sentence in sentences if not sentence == ''] # really making sure hypothesis does not keep sneakering empty sentences past me
-
+def sentences(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH) -> list[str]:
+    return draw(lists(sentence(), min_size=min_length, max_size=max_length, unique=True))
 
 @given(
         sentences=sentences(),
@@ -39,15 +45,14 @@ def test_numericalize(sentences, method, lower):
 # * Testing one-hot encoding
 
 @composite
-def numbered_sentence(draw, min_size: int=1, max_size: int=20, vocab_length: int=25) -> np.ndarray:
-    nums = draw(lists(integers(min_value=1, max_value=vocab_length), min_size=min_size, max_size=max_size)) # max value should not be too high for flaky tests
+def numbered_sentence(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> np.ndarray:
+    nums = draw(lists(integers(min_value=1, max_value=vocab_length), min_size=min_length, max_size=max_length)) # max value should not be too high for flaky tests
     return np.asarray(nums)
 
 @composite
-def numbered_sentences(draw, vocab_length: int=25, sentence_length: int=20) -> list[np.ndarray]:
+def numbered_sentences(draw, sentence_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> list[np.ndarray]:
     size = sentence_length
-    return draw(lists(numbered_sentence(min_size=size, max_size=size, vocab_length=vocab_length), min_size=2))
-
+    return draw(lists(numbered_sentence(min_length=size, max_length=size, vocab_length=vocab_length), min_size=2))
 
 @given(
         num_sentence=numbered_sentence(),
@@ -84,18 +89,16 @@ def test_weight_matrix_exception(size: int, min: float):
         _weight_matrix(size, min)
 
 
-
 # * Testing einsum
 @composite
 def einsum_data(draw) -> tuple[list[np.ndarray], int, int]:
     vocab_length = draw(integers(min_value=1, max_value=30))
     sentence_length = draw(integers(min_value=2, max_value=30))
-    sentences = draw(numbered_sentences(vocab_length, sentence_length))
-    assume(sentences != [])
+    sentences = draw(numbered_sentences(sentence_length=sentence_length, vocab_length=vocab_length))
+    assume(sentences != []) # Assuming sentences are not empty because they are annoying
     return sentences, vocab_length, sentence_length
 
-
-# * somewhat more of an integeration test but generating the right tensors is really annoying
+# somewhat more of an integeration test but generating the right tensors is really annoying
 @given(einsum_data())
 def test_einsum(data: tuple[list[np.ndarray], int, int]):
     sentences, vocab_length, sentence_length = data
