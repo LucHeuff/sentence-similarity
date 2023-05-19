@@ -81,4 +81,13 @@ def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
 
     return similarity
 
+def _to_dataframe(sentences: list[str], similarity: np.ndarray) -> pd.DataFrame:
+    new_names = {'level_0': 'sentence', 'level_1': 'other_sentence', 0: 'similarity'}
+    df = (pd.DataFrame(similarity, index=sentences, columns=sentences)
+          .stack()
+          .reset_index()
+          .rename(columns=new_names)
+          )
+    return df
+
     # TODO add scaling down cases where similarity larger than 1 through 1 - ([sim>1] - 1) before dividing by diagonal -> in the pandas conversion!

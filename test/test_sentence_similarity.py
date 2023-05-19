@@ -1,10 +1,12 @@
+import itertools
 import numpy as np
 from hypothesis import given, assume
 from hypothesis.strategies import composite, lists, text, integers, floats, sampled_from, booleans
+from hypothesis.extra.numpy import arrays
 from pytest import raises
 from string import printable
 
-from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum
+from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe
 from src.vocab import Vocab, tokenizer_options
 
 tokenizer_methods = list(tokenizer_options.keys())
@@ -108,3 +110,40 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]):
     n = len(sentences)
     assert einsum.shape == (n, n)
     assert all(np.diag(einsum))
+
+
+# # * Testing to_dataframe
+@composite
+def dataframe_data(draw) -> tuple[list[str], np.ndarray]:
+    sents = draw(sentences(min_length=2))
+    data = draw(arrays(
+        dtype=np.float64,
+        shape=(len(sents), len(sents)),
+        elements=floats(min_value=0, allow_infinity=False),
+        unique=True))
+    return sents, data
+
+@given(dataframe_data())
+def test_to_dataframe(data: tuple[list[str], np.ndarray]):
+    sentences, similarity = data
+
+    df = _to_dataframe(sentences, similarity)
+
+    assert df.shape == (len(sentences)**2, 3)
+    assert np.array_equal(df.columns, ['sentence', 'other_sentence', 'similarity'])
+    assert np.array_equal(df.sentence.unique(), sentences) 
+    assert np.array_equal(df.other_sentence.unique(), sentences) 
+
+    # checking whether values have ended up in the right place
+    indices = list(range(len(sentences)))
+    for i, j in itertools.product(indices, indices):
+        sentence = sentences[i]
+        other_sentence = sentences[j]
+        row = df.query("sentence == @sentence & other_sentence == @other_sentence")
+        assert row.similarity.values == similarity[i, j]
+
+
+# * integration test of sentence_similarity
+
+
+    
