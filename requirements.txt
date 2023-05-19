@@ -1,5 +1,5 @@
+hypothesis
 numpy
 pandas
-pytest
-hypothesis
 pandera
+pytest
