@@ -87,7 +87,7 @@ def test_weight_matrix(size: int, min: float):
 
 @given(
     size=integers(min_value=2, max_value=10),
-    min=floats(min_value=1)
+    min=floats().filter(lambda x: not 0. <= x <= 1.)  # generating floats outside of the range 0, 1
 )
 def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
