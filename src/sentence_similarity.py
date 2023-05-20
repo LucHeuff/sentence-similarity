@@ -10,7 +10,7 @@ def sentence_similarity(
         sentences: list[str],
         tokenize_method: str='words',
         lower: bool=False,
-        weight_matrix_min: float=0.1, # ? perhaps remove option if it is always better to do or not do
+        weight_matrix_min: float=0.1, 
         ) -> pd.DataFrame:
     """Compares sentences in the form of strings through a tokenisation method.
 
