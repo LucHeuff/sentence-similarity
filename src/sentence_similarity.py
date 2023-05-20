@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from numba import jit
 from functools import partial
 
 from src.vocab import Vocab

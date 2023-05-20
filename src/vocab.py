@@ -1,7 +1,5 @@
 import pandas as pd
-from pandera import SeriesSchema
 from collections import Counter
-from functools import partial
 from typing import Callable
 
 class IllegalArgumentError(ValueError):

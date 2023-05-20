@@ -1,5 +1,4 @@
 hypothesis
 numpy
 pandas
-pandera
 pytest
