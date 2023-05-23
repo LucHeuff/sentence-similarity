@@ -36,11 +36,7 @@ def sentence(draw) -> str:
 def sentences(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH) -> list[str]:
     return draw(lists(sentence(), min_size=min_length, max_size=max_length, unique=True))
 
-@given(
-        sentences=sentences(),
-        method=sampled_from(tokenizer_methods),
-        lower=booleans()
-        )
+@given(sentences=sentences(), method=sampled_from(tokenizer_methods), lower=booleans())
 def test_numericalize(sentences, method, lower):
     vocab = Vocab(sentences, method, lower)
     numericalized = _numericalize(sentences, vocab)
