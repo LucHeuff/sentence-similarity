@@ -1,13 +1,19 @@
 import re
 import string
 from collections import Counter
-from typing import Callable
+from typing import Protocol
 
 class IllegalArgumentError(ValueError):
     pass
 
-split_function = Callable[[str], list[str]]
-join_function = Callable[[list[str]], str]
+# * Nicer interfaces for functions instead of Callable
+class SplitFunction(Protocol):
+    def __call__(self, sentence: str) -> list[str]:
+        ...
+
+class JoinFunction(Protocol):
+    def __call__(self, tokens: list[str]) -> str:
+        ...
 
 space_token = "\x07" # deliberately using a printable character that will not collide with either spaces or punctuation
 
@@ -34,6 +40,7 @@ tokenizer_options = dict(
     characters=(split_characters, join_characters)
 )
 
+# TODO Does this have to be a class, if it is only ever used once?
 class Vocab:
     """Maintains a vocabulary that can translate sentences to numbers and back."""
     def __init__(
@@ -54,7 +61,7 @@ class Vocab:
         self.vocab = self._create_vocab(sentences)
         self.decoder = self._create_decoder()
     
-    def _get_split_and_join(self, tokenize_method: str) -> tuple[split_function, join_function]:
+    def _get_split_and_join(self, tokenize_method: str) -> tuple[SplitFunction, JoinFunction]:
         try:
             return tokenizer_options[tokenize_method]
         except KeyError:
