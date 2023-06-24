@@ -1,23 +1,32 @@
 import numpy as np
 import pandas as pd
 from functools import partial
+from typing import Protocol
 
-from src.vocab import Vocab
+from src.translator import create_default_translator
+
+class Translator(Protocol):
+    def encode(self, sentence: str) -> list[int]:
+        ...
+
+    def __len__(self) -> int:
+        """Returns the length of the vocabulary of the translator"""
+        ...
 
 EINSUM_OPT = "optimal"
-    
+
 def sentence_similarity(
         sentences: list[str],
-        tokenize_method: str='words',
-        lower: bool=False,
+        tokenize_method: str = "on_spaces",
+        translator: Translator | None = None,
         weight_matrix_min: float=0.1, 
         ) -> pd.DataFrame:
     """Compares sentences in the form of strings through a tokenisation method.
 
     Args:
         sentences (list[str]): list of sentences to be compared to each other in the form of strings
-        tokenize_method (str, optional): whether tokens should be 'words' or 'characters'. Choice depends on use case. Defaults to 'words'.
-        lower (bool, optional): Whether the strings should be converted to lowercase before any other operations. Use this when case sensitivity is not important. Defaults to False.
+        tokenize_method (str, optional): whether tokens should be 'words' or 'characters'. This option is ignored if translator is not None. Defaults to 'words'.
+        translator (Translator, optional): Allows you to provide a different Translator object that performs sentence encoding
         weight_matrix_min (float, optional): The weight matrix discounts sentences that have the same words, but in different places. This value controls the weight of the value that is furthest out.
                                              You may wish to raise the value if using short sentences or a small vocabulary. Defaults to 0.1.
 
@@ -27,10 +36,11 @@ def sentence_similarity(
                       A score above 1 indicates that substrings in the sentence are repeated multiple times in the other sentence, which tends to happen more often when tokenizing characters.
     """
     # Creating vocabulary to translate sentences into numbers
-    vocab = Vocab(sentences, tokenize_method, lower)
-    vocab_length = len(vocab)
+    if translator is None:
+        translator = create_default_translator(sentences, tokenize_method)
+    vocab_length = len(translator)
 
-    num_sentences = _numericalize(sentences, vocab)
+    num_sentences = _numericalize(sentences, translator)
     max_sentence_length = max(len(sentence) for sentence in num_sentences)
 
     one_hot_encode = partial(_one_hot_sentence, vocab_length=vocab_length, max_sentence_length=max_sentence_length)
@@ -43,8 +53,8 @@ def sentence_similarity(
 
     return _to_dataframe(sentences, similarity)
 
-def _numericalize(sentences: list[str], vocab: Vocab) -> list[np.ndarray]:
-    return [np.asarray(vocab.encode(sentence)) for sentence in sentences]
+def _numericalize(sentences: list[str], translator: Translator) -> list[np.ndarray]:
+    return [np.asarray(translator.encode(sentence)) for sentence in sentences]
 
 def _one_hot_sentence(
         sentence: np.ndarray, 
