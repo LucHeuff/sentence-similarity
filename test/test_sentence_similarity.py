@@ -1,8 +1,9 @@
 import itertools
 import string
 import numpy as np
+import hypothesis.strategies as st
 from hypothesis import given, assume
-from hypothesis.strategies import composite, lists, text, integers, floats, sampled_from, booleans
+from hypothesis.strategies import composite
 from hypothesis.extra.numpy import arrays
 from pytest import raises
 
@@ -23,13 +24,13 @@ alphabet = string.ascii_letters + string.digits + string.punctuation.replace("\\
 
 @composite
 def word(draw) -> str:
-    word = draw(text(alphabet, min_size=1, max_size=WORD_LENGTH))
+    word = draw(st.text(alphabet, min_size=1, max_size=WORD_LENGTH))
     assume(word != " ") # words are not allowed to be spaces 
     return word
 
 @composite
 def sentence(draw) -> str:
-    words = draw(lists(word())) 
+    words = draw(st.lists(word())) 
     sentence = " ".join(words)
     assume(sentence != "") # not allowed to be empty, I'm just assuming sentences are never empty
     return sentence
@@ -40,9 +41,9 @@ def sentence(draw) -> str:
 
 @composite
 def sentences(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH) -> list[str]:
-    return draw(lists(sentence(), min_size=min_length, max_size=max_length, unique=True))
+    return draw(st.lists(sentence(), min_size=min_length, max_size=max_length, unique=True))
 
-@given(sentences=sentences(), method=sampled_from(ALLOWED_TOKENIZE_METHODS))
+@given(sentences=sentences(), method=st.sampled_from(ALLOWED_TOKENIZE_METHODS))
 def test_numericalize(sentences, method):
     translator = create_default_translator(sentences, method)
     numericalized = _numericalize(sentences, translator)
@@ -62,8 +63,8 @@ def test_numericalize(sentences, method):
 
 @composite
 def numbered_sentence(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> np.ndarray:
-    nums = integers(min_value=0, max_value=vocab_length)
-    length = draw(integers(min_value=min_length, max_value=max_length))
+    nums = st.integers(min_value=0, max_value=vocab_length)
+    length = draw(st.integers(min_value=min_length, max_value=max_length))
     return draw(arrays(dtype=np.int64, shape=length, elements=nums))
 
 @given(num_sentence=numbered_sentence())
@@ -86,8 +87,8 @@ def test_one_hot_sentence(num_sentence: np.ndarray):
 # - Test if the weight matrix throws an exception if the min value is outside the range [0, 1]
 
 @given(
-    size=integers(min_value=2, max_value=10),
-    min=floats(min_value=0, max_value=0.99) 
+    size=st.integers(min_value=2, max_value=10),
+    min=st.floats(min_value=0, max_value=0.99) 
 )
 def test_weight_matrix(size: int, min: float):
     weight_matrix = _weight_matrix(size, min)
@@ -99,8 +100,8 @@ def test_weight_matrix(size: int, min: float):
     assert all(np.diag(weight_matrix))
 
 @given(
-    size=integers(min_value=2, max_value=10),
-    min=floats().filter(lambda x: not 0. <= x <= 1.)  # generating floats outside of the range [0, 1]
+    size=st.integers(min_value=2, max_value=10),
+    min=st.floats().filter(lambda x: not 0. <= x <= 1.)  # generating floats outside of the range [0, 1]
 )
 def test_weight_matrix_exception(size: int, min: float):
     with raises(ValueError):
@@ -115,12 +116,12 @@ def test_weight_matrix_exception(size: int, min: float):
 @composite
 def numbered_sentences(draw, sentence_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> list[np.ndarray]:
     size = sentence_length
-    return draw(lists(numbered_sentence(min_length=size, max_length=size, vocab_length=vocab_length), min_size=2))
+    return draw(st.lists(numbered_sentence(min_length=size, max_length=size, vocab_length=vocab_length), min_size=2))
 
 @composite
 def einsum_data(draw) -> tuple[list[np.ndarray], int, int]:
-    vocab_length = draw(integers(min_value=1, max_value=30))
-    sentence_length = draw(integers(min_value=2, max_value=30))
+    vocab_length = draw(st.integers(min_value=1, max_value=30))
+    sentence_length = draw(st.integers(min_value=2, max_value=30))
     sentences = draw(numbered_sentences(sentence_length=sentence_length, vocab_length=vocab_length))
     assume(sentences != []) # Assuming sentences are not empty because they are annoying
     return sentences, vocab_length + 1, sentence_length
@@ -155,7 +156,7 @@ def dataframe_data(draw) -> tuple[list[str], np.ndarray]:
     data = draw(arrays(
         dtype=np.float64,
         shape=(len(sents), len(sents)),
-        elements=floats(min_value=0, allow_infinity=False),
+        elements=st.floats(min_value=0, allow_infinity=False),
         unique=True))
     return sents, data
 
@@ -187,8 +188,8 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray]):
 
 @given(
     sentences=sentences(),
-    tokenize_method=sampled_from(ALLOWED_TOKENIZE_METHODS),
-    weight_matrix_min=floats(min_value=0, max_value=0.999)
+    tokenize_method=st.sampled_from(ALLOWED_TOKENIZE_METHODS),
+    weight_matrix_min=st.floats(min_value=0, max_value=0.999)
 )
 def test_sentence_similarity(sentences: list[str], tokenize_method: str, weight_matrix_min: float):
     similarity = sentence_similarity(sentences, tokenize_method, weight_matrix_min=weight_matrix_min)
