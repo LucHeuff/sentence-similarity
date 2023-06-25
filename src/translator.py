@@ -73,6 +73,11 @@ class BaseTranslator:
 
 # * Default Translator
 
+# TODO does this need to exist? I
+# ? If I'm making a factory function anyway, doesn't it make more sense to get rid of the Protocol and the DefaultTranslator,
+# ? and simply generate Translators(tokenizer, vocab) through the factories?
+# ? Makes testing a bunch easier too....
+
 class DefaultTranslator(BaseTranslator):
     """Creates a DefaultTranslator that constructs a vocabulary from a list of sentences, using a chosen tokenizing function.
     """
@@ -122,4 +127,28 @@ def create_default_translator(sentences: list[str], tokenize_method: str='on_spa
     tokenizer = _tokenize_functions[tokenize_method]
     return DefaultTranslator(sentences, tokenizer)
 
-# TODO (?) implement translator that take synonyms into account, and translator that uses string comparison?
+def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer: TokenizeFunction) -> dict[str, int]:
+    # starting with making a list of all tokens that exists in the sentences
+    sentences = list(set(sentences)) # making sure only to work with unique sentences
+    tokenized_sentences = [tokenizer(sentence) for sentence in sentences]
+    tokens = {token for sentence in tokenized_sentences for token in sentence}
+    
+    # flatting the list of synonym tuples so it's easier to check if tokens appear in them
+    all_synonym_tokens = [synonym for synonym_list in synonyms for synonym in synonym_list]
+    # throwing an exception if any of the tokens provided in synonyms does not appear in the tokens derived from sentences
+    if not any([synonym in tokens for synonym in all_synonym_tokens]):
+        raise ValueError("Received a token in synonyms that does not appear in sentences")
+    
+    tokens_list = synonyms.copy() # copy list of synonyms into a new list
+    [tokens_list.append((token, )) for token in tokens if token not in all_synonym_tokens] # add detected tokens if they are not in the list already
+
+    vocab = {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens}
+    return vocab
+
+#TODO create_synonym_translator convenience function ?
+
+# TODO create_string_distancee_vocab
+
+# TODO create_string_distance_translator ?
+
+# TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
