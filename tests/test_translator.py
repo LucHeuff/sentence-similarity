@@ -5,10 +5,6 @@ from hypothesis.strategies import composite
 from pytest import raises
 from typing import Callable
 
-# TODO better documentation in strategy generation and why tests are performed.
-
-# TODO perhaps refactor where code becomes repetitive
-
 punctuation = string.punctuation.replace("\\", "")
 alphabet = string.ascii_letters + string.digits + punctuation
 whitespace = string.whitespace
@@ -19,50 +15,53 @@ token_strategy = Callable[[], st.SearchStrategy[str]]
 
 @composite
 def character_strategy(draw) -> str:
+    """Generates a single character, including whitespace"""
     character = draw(st.text(alphabet + whitespace, min_size=1, max_size=1))
     return character
 
 @composite
 def word_strategy(draw) -> str:
+    """Generates a 'word' consisting of multiple characters, excluding whitespace"""
     word = draw(st.text(alphabet, min_size=1, max_size=10))
     return word
 
 # * Testing tokenizer functions
-# - Test whether each token that went into the sentence is properly tokenized
 
 from src.translator import tokenize_on_spaces, tokenize_characters
 
 @composite
 def word_tokens_strategy(draw) -> tuple[list[str], str]:
+    """Generates a set of words and combines those words into a sentence with a whitespace.
+    Allows testing whether tokenization correctly recovers the words that went into the sentence.    
+    """
     words = draw(st.lists(word_strategy(), min_size=1))
     sentence = " ".join(words)
     return words, sentence
 
 @given(data=word_tokens_strategy())
 def test_tokenize_on_spaces(data):
+    """Testing whether tokenizing on spaces returns the words that went into the sentence"""
     words, sentence = data
-    assert tokenize_on_spaces(sentence) == words  # testing whether the tokenizer returns each word
+    assert tokenize_on_spaces(sentence) == words  
 
 @composite
 def character_tokens_strategy(draw) -> tuple[list[str], str]:
+    """Generates a set of characters and combines these characters into a sentence by pasting them together directly.
+    Allows testing whether tokenization correctly recovers the characters that went into the sentence.
+    """
     characters = draw(st.lists(character_strategy(), min_size=1))
     sentence = "".join(characters)
     return characters, sentence  
 
 @given(data=character_tokens_strategy())
 def test_tokenize_characters(data: dict):
+    """Testing whether tokenizing on characters returns the charactes that went into the sentence"""
     characters, sentence = data
     assert tokenize_characters(sentence) == characters # testing whether the tokenizer returns each character
 
-# * Testing BaseTranslator
-#  - Test whether sentences are encoded correctly
-#  - Test whether the length of the Translator returns the length of the vocab
+# * Testing Translator
 
-# - Test whether AssertionErrors are correctly thrown when an invalid vocab is provided
-
-from src.translator import _tokenize_functions, TokenizeFunction, BaseTranslator
-
-ALLOWED_TOKENIZERS = list(_tokenize_functions.keys())
+from src.translator import tokenize_function, Translator
 
 join_func = Callable[[list[str]], str]
 
@@ -73,52 +72,63 @@ tokenizer_factory = {
 }
 
 @composite
-def tokenizing_method_strategy(draw) -> tuple[TokenizeFunction, token_strategy, join_func]:
-    tokenize_method = draw(st.sampled_from(ALLOWED_TOKENIZERS))
-    return tokenizer_factory[tokenize_method]
+def tokenizing_method_strategy(draw) -> tuple[tokenize_function, token_strategy, join_func]:
+    """Since the behaviour of tokens differs between tokenizers, creating a separate strategy to keep the required functions and strategies together."""
+    tokenize_method = draw(st.sampled_from(list(tokenizer_factory.keys())))
+    return tokenizer_factory[tokenize_method]  # NOTE should raise an error when a new tokenizer is added but not included in the tokenizer_factory :)
 
 @composite
-def base_translator_strategy(draw) -> tuple[TokenizeFunction, dict[str, int], list[int], str]:
+def translator_strategy(draw) -> tuple[tokenize_function, dict[str, int], list[int], str]:
+    """Generating a tokenizer, vocab, encodings and sentence to test whether the translator behaves properly:
+    - Generating a vocab with tokens beloning to a tokenizing strategy
+    - Generating a random encoding
+    - Generating a sentence from that encoding through reversing the vocab. This allows testing whether the translator encodes properly.    
+    """
     tokenizer, sampler, join_function = draw(tokenizing_method_strategy())
     
-    randomizer = draw(st.randoms())
+    randomizer = draw(st.randoms()) # creating a randomizer to shuffle values in the vocab, so it's not always 0 through max down the vocab.
 
     # generating vocabulary
-    _vocab_length = draw(st.integers(min_value=5, max_value=10))
-    keys = draw(st.lists(sampler(), min_size=_vocab_length, max_size=_vocab_length, unique=True))
-    values = list(range(_vocab_length))
-    randomizer.shuffle(values) # randomizing order to make sure this doesn't influence the Translator
-    vocab = {key: value for (key, value) in zip(keys, values)}
-    _reverse_vocab = {value: key for (key, value) in vocab.items()} # reversing so I can generate a sentence form encodings
-    # create an encoded sentence and constructing an accompanying sentence through the vocab from that
+    _vocab_length = draw(st.integers(min_value=5, max_value=10))   # varying vocab length
+    keys = draw(st.lists(sampler(), min_size=_vocab_length, max_size=_vocab_length, unique=True))  # sampling tokens of equal length to the vocab
+    values = list(range(_vocab_length))   # shuffling values 
+    randomizer.shuffle(values) # randomizing to make sure order doesn't influence the Translator
+    vocab = {key: value for (key, value) in zip(keys, values)}  # constructing the vocab
+    _reverse_vocab = {value: key for (key, value) in vocab.items()} # reversing so a sentence can be generated from encodings
+    # create an encoded sentence and constructing an accompanying sentence through the vocab 
     encodings = draw(st.lists(st.sampled_from(values), min_size=1))
     sentence = join_function(_reverse_vocab[num] for num in encodings)
 
     return tokenizer, vocab, encodings, sentence
 
-@given(data=base_translator_strategy())
-def test_base_translator(data):
+@given(data=translator_strategy())
+def test_translator(data):
+    """Testing Translator:
+    - Testing whether sentences are correctly encoded
+    - Testing whether the __len__ on the translator correctly returns the length of the vocab    
+    - Testing whether the __len__ on the translator is an int
+    """
     tokenizer, vocab, encodings, sentence = data
-    translator = BaseTranslator(tokenizer, vocab)
+    translator = Translator(tokenizer, vocab)
 
     assert translator.encode(sentence) == encodings
     assert len(translator) == len(vocab)
+    assert isinstance(len(translator), int)
 
 @given(
     tokenizer = st.sampled_from([tokenize_on_spaces, tokenize_characters]),
     negative_vocab = st.dictionaries(keys=word_strategy(), values=st.integers(max_value=-1), min_size=5)
 )
-def test_base_translator_negative_vocab(tokenizer, negative_vocab):
+def test_translator_negative_vocab_assertion(tokenizer, negative_vocab):
+    """Testing whether Translator correctly fails assertion when negative values are supplied in the vocab"""
     with raises(AssertionError):
-        BaseTranslator(tokenizer, negative_vocab)
-
+        Translator(tokenizer, negative_vocab)
 
 @composite
 def too_large_values_vocab(draw):
     """Generating a vocab that has larger values in it than it is long"""
     _vocab_length = draw(st.integers(min_value=1, max_value=10))
-    too_large_vocab = draw(
-        st.dictionaries(
+    too_large_vocab = draw(st.dictionaries(
             keys=word_strategy(), 
             values=st.integers(min_value=_vocab_length+1), 
             min_size=_vocab_length, max_size=_vocab_length))
@@ -128,63 +138,68 @@ def too_large_values_vocab(draw):
     tokenizer = st.sampled_from([tokenize_on_spaces, tokenize_characters]),
     too_large_vocab = too_large_values_vocab()
 )
-def test_base_translator_too_large_vocab(tokenizer, too_large_vocab):
+def test_translator_too_large_value_vocab_assertion(tokenizer, too_large_vocab):
+    """Testing whether Translator correctly fails assertion when vocab contains values that are larger than its length"""
     with raises(AssertionError):
-        BaseTranslator(tokenizer, too_large_vocab)
+        Translator(tokenizer, too_large_vocab)
 
-# * Testing create_vocab
-# - Test whether all tokens present in sentences appear in the vocab
-# - Testing whether the minimum value of the vocab is 0
-# - Testing whether each value in the vocab is an integer
-
-# * Testing DefaultTranslator
-# - Test whether decoding the encoded strings results in the original string
-# - Test whether encodings result in integers
-# - Test whether vocab is created correctly:
-#       - Check if all the used words end up in the vocab 
-# - Test whether length of DefaultTranslator returns the same length as the corpus  
-
-# - Test if trying to create a DefaultTranslator with an unknown tokenize method results in a ValueError
-
-from src.translator import create_vocab, create_default_translator, DefaultTranslator, IllegalArgumentError
-
+from src.translator import create_vocab, create_default_translator, IllegalArgumentError
 
 @composite
-def sentence(draw, corpus) -> str:
+def sentence_list(draw, corpus: list[str]) -> list[str]:
+    """Generates a list of tokens by sampling from a provided corpus of tokens"""
     sentence = draw(st.lists(st.sampled_from(corpus), min_size=1))
     return sentence
 
+# * Testing create_default_translator() & create_vocab()
+
 @composite
-def default_translator_strategy(draw) -> tuple[set, list[str], bool, str]:
+def default_translator_strategy(draw) -> tuple[set[str], list[str], tokenize_function, join_func]:
+    """Generates a corpus of tokens, sentences drawn from that corpus, a tokenizer, and a method of joining tokens according to the tokenizer.
+    """
     tokenizer, sampler, join_function = draw(tokenizing_method_strategy())
 
-    # Generating tokens to sample from 
-    candidate_corpus = draw(st.lists(sampler(), min_size=10))
-    sentences = draw(st.lists(sentence(candidate_corpus), min_size=5))
-    # Deducing which tokens were used in the sentences
-    corpus = {token for sentence in sentences for token in sentence}
-    # converting the lists of tokens into a single string
-    sentences = [join_function(sentence) for sentence in sentences]
+    # First generating tokens to sample sentences from, then afterward reconstruction which tokens were used in the sentences as the actual corpus.
+    # This is much easier than trying to make sure the sentences use all the tokens in the candidate corpus but are still random enough
+    candidate_corpus = draw(st.lists(sampler(), min_size=10))    # Generating tokens to sample from 
+    sentences_lists = draw(st.lists(sentence_list(candidate_corpus), min_size=5))  # generating a list of lists of tokens as sentences
+    corpus = {token for sentence in sentences_lists for token in sentence} # Deducing which unique tokens were used in the sentences by flattening the lists
+    sentences = [join_function(sentence) for sentence in sentences_lists] # convertings the sentence lists into proper sentences [str]
 
     return corpus, sentences, tokenizer, join_function
 
 def _test_vocab(corpus: set, vocab: dict[str, int]):
-    assert corpus == set(vocab.keys())  # testing whether all words in the corpus ended up in the vocab
-    assert len(corpus) == len(vocab)  # testing the length of the corpus agrees with the length of the vocab
-    assert min(vocab.values()) == 0  # testing whether the smallest value in the vocab is zero
-    assert set(map(type, vocab.values())) == {int} # testing whether all values in the vocab are integers
-
+    """Helper function as these tests are repeated more often.
+    - Testing whether the vocab contains alls the tokens in the corpus
+    - Testing whether the length of the corpus is equal to the length of the corpus (no redundant tokens)
+    - Testing whether the smallest value in the vocab is 0
+    - Testing whether all the values in the vocab are integers
+    - Testing whether the largest value in the vocab is less than or equal to the length of the vocab
+    """
+    assert corpus == set(vocab.keys())  
+    assert len(corpus) == len(vocab) 
+    assert min(vocab.values()) == 0  
+    assert set(map(type, vocab.values())) == {int}
+    assert max(vocab.values()) <= len(vocab) 
 
 @given(data=default_translator_strategy())
 def test_create_vocab(data):
+    """Testing creation of vocab"""
     corpus, sentences, tokenizer, _ = data
     vocab = create_vocab(sentences, tokenizer)
     _test_vocab(corpus, vocab)
 
+
 @given(data=default_translator_strategy())
-def test_default_translator(data):
+def test_create_default_translator(data):
+    """Testing creating of default translator:
+    - Testing whether all tokens in the sentences ended up in the translator vocab
+    - Testing whether the length of the translator is equal to the length of the corpus
+    - Testing whether encoding then decoding a sentence returns the original sentence
+    - Testing whether encoding results in lists of integers    
+    """
     corpus, sentences, tokenizer, join_function = data
-    translator = DefaultTranslator(sentences, tokenizer)
+    translator = create_default_translator(sentences, tokenizer)
 
     reverse_vocab = {value: key for (key, value) in translator.vocab.items()} # reversing vocab to allow decoding
 
@@ -198,28 +213,15 @@ def test_default_translator(data):
         assert decode(encoding) == sentence # checking if reversing encoding restores the sentence
         assert all(isinstance(item, int) for item in encoding) # checking if encodings return integers
 
-@given(
-    sentences = st.lists(st.lists(word_strategy(), min_size=1), min_size=1),
-    method = word_strategy().filter(lambda s: s not in ALLOWED_TOKENIZERS)
-)
-def test_create_default_translator_raises_exception(sentences, method):
-    with raises(IllegalArgumentError):
-        create_default_translator(sentences, method)
-
-
 # * Testing create_synonym_vocab
-# - Test whether all tokens appear in the vocab
-# - Test whether length of corpus and vocab agree
-# - Test whether the smallest value in the vocab is zero
-# - Test whether all values in the vocab are integers
-# - Test whether all synonyms get the same value
-
-# - Test whether create_synonym_vocab throws an exception if it receives a token that is not in the sentences
 
 from src.translator import create_synonym_vocab
 
 @composite
-def synonym_vocab_strategy(draw):
+def synonym_vocab_strategy(draw) -> tuple[set[str], list[str], list[tuple[str]], tokenize_function]:
+    """Generate a corpus, sentences, synonyms and a tokenizer.
+    Synonyms are a single list[str] sampled from the corpus.    
+    """ 
     corpus, sentences, tokenizer, _ = draw(default_translator_strategy()) # start with default strategy
 
     assume(len(corpus) > 2)  # filtering out corpuses that are too small since this can cause trouble when sampling synonyms
@@ -232,6 +234,10 @@ def synonym_vocab_strategy(draw):
 
 @given(data=synonym_vocab_strategy())
 def test_create_synonym_vocab(data):
+    """Testing create_synonym_vocab().
+    In addition to the standard vocab tests:
+    # - Test whether all the synonyms from the single synonym list get the same value in the vocab.
+    """
     corpus, sentences, synonyms, tokenizer = data
     vocab = create_synonym_vocab(sentences, synonyms, tokenizer)
     _test_vocab(corpus, vocab)  # performing basic checks for vocabs
@@ -239,10 +245,8 @@ def test_create_synonym_vocab(data):
     for syn_list in synonyms:
         assert len({vocab[syn] for syn in syn_list}) == 1 # if all values are the same, length of its set should be 1
     
-# TODO check throwing exception
-
 @composite
-def synonym_exception_strategy(draw):
+def synonym_exception_strategy(draw) -> tuple[list[str], list[tuple[str]], tokenize_function]:
     """Generating a corpus of tokens, sentences consisting of tokens in the corpus, a tokenizer 
     and a set of synonyms that do not appear in the sentences,
     to test whether create_synonym_vocab() correctly throws a ValueError.
@@ -252,10 +256,11 @@ def synonym_exception_strategy(draw):
     synonyms = draw(st.lists(word_strategy(), min_size=2))  # generating new random word tokens that are (probably) not in the corpus
     assume(all([synonym not in corpus for synonym in synonyms])) # making sure the new tokens are actually not in the corpus
 
-    return corpus, sentences, [synonyms], tokenizer
+    return sentences, [synonyms], tokenizer
 
 @given(data=synonym_exception_strategy())
 def test_synonym_vocab_exception(data):
-    corpus, sentences, synonyms, tokenizer = data
+    """Testing whether create_synonym_vocab() correctly throws a value error when synonym tokens are provided that do not appear in the sentences."""
+    sentences, synonyms, tokenizer = data
     with raises(ValueError):
         create_synonym_vocab(sentences, synonyms, tokenizer)

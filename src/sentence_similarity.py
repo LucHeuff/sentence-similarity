@@ -3,7 +3,7 @@ import pandas as pd
 from functools import partial
 from typing import Protocol
 
-from src.translator import create_default_translator
+from src.translator import create_default_translator, tokenize_function, tokenize_on_spaces
 
 class Translator(Protocol):
     def encode(self, sentence: str) -> list[int]:
@@ -17,7 +17,7 @@ EINSUM_OPT = "optimal"
 
 def sentence_similarity(
         sentences: list[str],
-        tokenize_method: str = "on_spaces",
+        tokenizer: tokenize_function=tokenize_on_spaces,
         translator: Translator | None = None,
         weight_matrix_min: float=0.1, 
         ) -> pd.DataFrame:
@@ -25,8 +25,8 @@ def sentence_similarity(
 
     Args:
         sentences (list[str]): list of sentences to be compared to each other in the form of strings
-        tokenize_method (str, optional): whether tokens should be 'words' or 'characters'. This option is ignored if translator is not None. Defaults to 'words'.
-        translator (Translator, optional): Allows you to provide a different Translator object that performs sentence encoding
+        tokenizer (tokenize_function, optional): function to perform tokenization. Also allows providing custom tokenization function. Defaults to tokenize_on_spaces.
+        translator (Translator | None, optional): Translator object that performs sentence encoding. Also llows providing a custom Translator object. Defaults to None.
         weight_matrix_min (float, optional): The weight matrix discounts sentences that have the same words, but in different places. This value controls the weight of the value that is furthest out.
                                              You may wish to raise the value if using short sentences or a small vocabulary. Defaults to 0.1.
 
@@ -37,7 +37,7 @@ def sentence_similarity(
     """
     # Creating vocabulary to translate sentences into numbers
     if translator is None:
-        translator = create_default_translator(sentences, tokenize_method)
+        translator = create_default_translator(sentences, tokenizer)
     vocab_length = len(translator)
 
     num_sentences = _numericalize(sentences, translator)

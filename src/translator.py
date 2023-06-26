@@ -1,12 +1,9 @@
-from typing import Protocol
+from typing import Callable
 
 class IllegalArgumentError(ValueError):
     pass
 
-# * Interfaces for functions
-class TokenizeFunction(Protocol):
-    def __call__(self, sentence: str) -> list[str]:
-        ...
+tokenize_function = Callable[[str], list[str]]
 
 # * Creating basic tokenizers
 def tokenize_on_spaces(sentence: str) -> list[str]:
@@ -31,27 +28,10 @@ def tokenize_characters(sentence: str) -> list[str]:
     """
     return list(sentence)
 
-_tokenize_functions = {
-    "on_spaces": tokenize_on_spaces,
-    "characters": tokenize_characters
-}
-
-ALLOWED_TOKENIZE_METHODS = list(_tokenize_functions.keys())
-
-# * Creating the Translator
-
-class Translator(Protocol):
-    def encode(self, sentence: str) -> list[int]:
-        ...
-
-    def __len__(self) -> int:
-        ...
-
-
-class BaseTranslator:
+class Translator:
     """Base class for Translators
     """
-    def __init__(self, tokenizer: TokenizeFunction, vocab: dict[str, int]):
+    def __init__(self, tokenizer: tokenize_function, vocab: dict[str, int]):
         """Initialise a Translator
 
         Args:
@@ -60,37 +40,51 @@ class BaseTranslator:
         """
         self.tokenize = tokenizer
         self.vocab = vocab
-        assert min(vocab.values()) >= 0, "Lowest value in vocab cannot be less than 0!"
-        assert len(vocab) == max(vocab.values()) + 1, "The largest value in the vocab must be equal to the length of the vocab!"
+        assert min(vocab.values()) == 0, "Lowest value in vocab should be 0."
+        assert len(vocab) == max(vocab.values()) + 1, "The largest value in the vocab should be equal to the length of the vocab."
 
 
     def encode(self, sentence: str) -> list[int]:
         return [self.vocab[token] for token in self.tokenize(sentence)]
     
     def __len__(self):
-        return len(self.vocab)
+        return max(self.vocab.values()) + 1 # Adding one since arrays start at 0
     
 
-# * Default Translator
+# * Default Translator factory
 
-# TODO does this need to exist? I
-# ? If I'm making a factory function anyway, doesn't it make more sense to get rid of the Protocol and the DefaultTranslator,
-# ? and simply generate Translators(tokenizer, vocab) through the factories?
-# ? Makes testing a bunch easier too....
+def create_default_translator(sentences: list[str], tokenizer: tokenize_function=tokenize_on_spaces) -> Translator:
+    """Creates a default translator from a list of sentences and a tokenizer function
 
-class DefaultTranslator(BaseTranslator):
-    """Creates a DefaultTranslator that constructs a vocabulary from a list of sentences, using a chosen tokenizing function.
+    Args:
+        sentences (list[str]): list of sentences to be translated.
+        tokenizer (tokenize_function, optional): function with which to perform tokenization. Defaults to tokenize_on_spaces.
+
+    Returns:
+        Translator: object to perform translation from sentences to numericalised lists.
     """
-    def __init__(self, sentences: list[str], tokenizer: TokenizeFunction):
-        """
-        Args:
-            sentences (list[str]): list of sentences in the form of strings
-            tokenizer (TokenizeFunction): function to perform tokenization on the sentences.
-        """
-        self.tokenize = tokenizer
-        self.vocab = create_vocab(sentences, tokenizer)
+    vocab = create_vocab(sentences, tokenizer)
+    return Translator(tokenizer, vocab)
 
-def create_vocab(sentences: list[str], tokenizer: TokenizeFunction) -> dict[str, int]:
+# * Functions for creating vocabs
+
+def _tokenize_sentences(sentences: list[str], tokenizer: tokenize_function) -> set[str]:
+    """Helper function that converts sentences into a set of unique tokens
+
+    Args:
+        sentences (list[str]): sentences to be tokenized
+        tokenizer (tokenize_function): tokenizer function
+
+    Returns:
+        set[str]: set of unique tokens extracted from the sentences
+    """
+    sentences = list(set(sentences))  # making sure each sentence is unique, so we don't do redundant operations
+    # tokenizing each sentence and then flattening to a set of tokens
+    tokenized_sentences = [tokenizer(sentence) for sentence in sentences]
+    tokens = {token for sentence in tokenized_sentences for token in sentence}
+    return tokens
+
+def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str, int]:
     """Creates a vocabulary dictionary which pairs each unique token in the sentences with a unique integer.
 
     Args:
@@ -100,39 +94,26 @@ def create_vocab(sentences: list[str], tokenizer: TokenizeFunction) -> dict[str,
     Returns:
         dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
     """
-    sentences = list(set(sentences))  # making sure each sentence is unique, so we don't do redundant operations
-    # tokenizing each sentence and then flattening to a set of tokens
-    tokenized_sentences = [tokenizer(sentence) for sentence in sentences]
-    tokens = {token for sentence in tokenized_sentences for token in sentence}
-    # creating a counter
-    vocab = {token: i for (i, token) in enumerate(tokens)}
+    tokens = _tokenize_sentences(sentences, tokenizer)  # extracting unique tokens from sentences
+    vocab = {token: i for (i, token) in enumerate(tokens)} # enumerating these into a dictionary
     return vocab
 
-def create_default_translator(sentences: list[str], tokenize_method: str='on_spaces') -> DefaultTranslator:
-    """Creates a DefaultTranslator from a list of sentences and a tokenization method
+
+def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer: tokenize_function) -> dict[str, int]:
+    """Creates a vocabulary dictionary where synymous tokens receive the same value in the vocab.
 
     Args:
-        sentences (_type_): list of sentences in the form of strings
-        tokenize_method (str): either 'on_spaces' to have tokens generated by splitting sentences on spaces (default),
-                               or 'characters' to have tokens be single characters.
+        sentences (list[str]): _description_
+        synonyms (list[tuple]): _description_
+        tokenizer (tokenize_function): _description_
 
     Raises:
-        IllegalArgumentError: if any other method than 'on_spaces' or 'characters' is provided.
+        ValueError: _description_
 
     Returns:
-        DefaultTranslator
+        dict[str, int]: _description_
     """
-    if tokenize_method not in ALLOWED_TOKENIZE_METHODS:
-        raise IllegalArgumentError(f"Unknown tokenize method provided. Allowed options are [{', '.join(ALLOWED_TOKENIZE_METHODS)}] but received {tokenize_method}]")
-    tokenizer = _tokenize_functions[tokenize_method]
-    return DefaultTranslator(sentences, tokenizer)
-
-def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer: TokenizeFunction) -> dict[str, int]:
-    # starting with making a list of all tokens that exists in the sentences
-    sentences = list(set(sentences)) # making sure only to work with unique sentences
-    tokenized_sentences = [tokenizer(sentence) for sentence in sentences]
-    tokens = {token for sentence in tokenized_sentences for token in sentence}
-    
+    tokens = _tokenize_sentences(sentences, tokenizer) # extracting unique tokens from sentences
     # flatting the list of synonym tuples so it's easier to check if tokens appear in them
     all_synonym_tokens = [synonym for synonym_list in synonyms for synonym in synonym_list]
     # throwing an exception if any of the tokens provided in synonyms does not appear in the tokens derived from sentences
@@ -140,15 +121,11 @@ def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer:
         raise ValueError("Received a token in synonyms that does not appear in sentences")
     
     tokens_list = synonyms.copy() # copy list of synonyms into a new list
-    [tokens_list.append((token, )) for token in tokens if token not in all_synonym_tokens] # add detected tokens if they are not in the list already
-
-    vocab = {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens}
+    [tokens_list.append((token, )) for token in tokens if token not in all_synonym_tokens] # add extracted tokens if they are not in the list already
+    vocab = {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens} # enumerating tokens list into dictionary, making sure synonyms get the same token
     return vocab
 
-#TODO create_synonym_translator convenience function ?
 
-# TODO create_string_distancee_vocab
-
-# TODO create_string_distance_translator ?
+# TODO create_string_distance_vocab
 
 # TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
