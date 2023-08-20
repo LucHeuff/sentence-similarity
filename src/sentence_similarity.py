@@ -26,7 +26,7 @@ def sentence_similarity(
     Args:
         sentences (list[str]): list of sentences to be compared to each other in the form of strings
         tokenizer (tokenize_function, optional): function to perform tokenization. Also allows providing custom tokenization function. Defaults to tokenize_on_spaces.
-        translator (Translator | None, optional): Translator object that performs sentence encoding. Also llows providing a custom Translator object. Defaults to None.
+        translator (Translator | None, optional): Translator object that performs sentence encoding. Also allows providing a custom Translator object. Defaults to None.
         weight_matrix_min (float, optional): The weight matrix discounts sentences that have the same words, but in different places. This value controls the weight of the value that is furthest out.
                                              You may wish to raise the value if using short sentences or a small vocabulary. Defaults to 0.1.
 
