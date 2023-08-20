@@ -2,3 +2,4 @@ hypothesis
 numpy
 pandas
 pytest
+strsimpy
