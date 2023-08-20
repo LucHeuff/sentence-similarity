@@ -213,7 +213,7 @@ def test_create_default_translator(data):
         assert decode(encoding) == sentence # checking if reversing encoding restores the sentence
         assert all(isinstance(item, int) for item in encoding) # checking if encodings return integers
 
-# * Testing create_synonym_vocab
+# * Testing create_synonym_vocab()
 
 from src.translator import create_synonym_vocab
 
@@ -264,3 +264,50 @@ def test_synonym_vocab_exception(data):
     sentences, synonyms, tokenizer = data
     with raises(ValueError):
         create_synonym_vocab(sentences, synonyms, tokenizer)
+
+# * Testing create_string_distance_vocab()
+from src.translator import create_string_distance_vocab
+
+# I need to test:
+# - whether tokens that are distance n away also get the same value in the vocab
+@composite
+def string_distance_vocab_strategy(draw) -> tuple[set[str], list[str], tokenize_function, int, list[tuple[str]]]:
+    """Generate a corpus, distance, words within that distance, sentences and a tokenizer
+    Words within distance are a list of tuples with word pairs within the distance.
+    """
+    tokenizer, sampler, join_function = tokenizer_factory['on_spaces']
+    candidate_corpus = draw(st.lists(sampler(), min_size=10))
+    distance  = draw(st.integers(min_value=2, max_value=6))
+    n_extra_words = draw(st.integers(min_value=2, max_value=max(len(candidate_corpus)//3, 2)))
+    words_with_distance = draw(st.lists(st.sampled_from(candidate_corpus), min_size=n_extra_words, max_size=n_extra_words))
+
+    word_pairs = []
+    for i, word in enumerate(words_with_distance):
+        new_word = word + "a"*distance # only testing insertions, as testing substitutions and deletions is hard and essentially tests Levenshtein, not the vocab!
+        word_pairs.append((word, new_word))
+        words_with_distance[i] = new_word
+    
+    candidate_corpus = candidate_corpus + words_with_distance 
+    sentences_lists = draw(st.lists(sentence_list(candidate_corpus), min_size=5))
+    corpus = {token for sentence in sentences_lists for token in sentence}
+    sentences = [join_function(sentence) for sentence in sentences_lists]
+    # figure out how I'm going to get the word pairs correct
+
+    words_with_dist_in_corpus = [word in corpus for word in words_with_distance]
+    assume(len(words_with_dist_in_corpus) > 0)
+    word_pairs = [word_pair for word_pair in word_pairs if word_pair[1] in words_with_dist_in_corpus]
+
+    return corpus, sentences, tokenizer, distance, word_pairs
+    
+@given(data=string_distance_vocab_strategy())
+def test_string_distance_vocab(data):
+    """Testing create_string_distance_vocab() 
+    In addition to the standard vocab tests:
+    - Test whether word pairs with a set distance between them get the same value in the vocab
+    """
+    corpus, sentences, tokenizer, distance, word_pairs = data
+    vocab = create_string_distance_vocab(sentences, distance, tokenizer)
+    _test_vocab(corpus, vocab)
+    # checking if all word pairs receive the same value from the vocab
+    for word, other_word in word_pairs:
+        assert vocab[word] == vocab[other_word]

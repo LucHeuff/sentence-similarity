@@ -1,4 +1,7 @@
-from typing import Callable
+import numpy as np
+from typing import Callable, Protocol
+from strsimpy.string_distance import StringDistance
+from strsimpy.levenshtein import Levenshtein
 
 class IllegalArgumentError(ValueError):
     pass
@@ -84,6 +87,7 @@ def _tokenize_sentences(sentences: list[str], tokenizer: tokenize_function) -> s
     tokens = {token for sentence in tokenized_sentences for token in sentence}
     return tokens
 
+
 def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str, int]:
     """Creates a vocabulary dictionary which pairs each unique token in the sentences with a unique integer.
 
@@ -99,7 +103,7 @@ def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str
     return vocab
 
 
-def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer: tokenize_function) -> dict[str, int]:
+def create_synonym_vocab(sentences: list[str], synonyms: list[tuple[str]], tokenizer: tokenize_function) -> dict[str, int]:
     """Creates a vocabulary dictionary where synymous tokens receive the same value in the vocab.
 
     Args:
@@ -126,6 +130,36 @@ def create_synonym_vocab(sentences: list[str], synonyms: list[tuple], tokenizer:
     return vocab
 
 
+def create_string_distance_vocab(
+        sentences: list[str],
+        distance: int, 
+        tokenizer: tokenize_function=tokenize_on_spaces, 
+        string_distance: StringDistance=Levenshtein(),
+        ):
+    vocab = create_vocab(sentences, tokenizer)
+    tokens = np.asarray(list(vocab.keys())) # tokens to np array for direct indexing
+
+    # Tokens are in the order of the number they receive from the vocabulary.
+    # This means that when the tokens are enumerated, I can use the ordering to optimise things a bit.
+    # Which is not a luxury, this stuff is really slow. TODO fix these algorithms myself?
+
+    for index, key in enumerate(tokens):
+        # The number is assumed to be the same as the index. If it is not, we have previously changed this number and can skip this key.
+        if vocab[key] < index:
+            continue
+        # I only need to look from this token (given by index) onwards, not backwards, which speeds things up substantially
+        close_tokens = [string_distance.distance(key, token) < distance for token in tokens[index:]]
+        # reading out the similar tokens
+        similar = tokens[index:][close_tokens]
+        if len(similar) < 1: # skipping if there were no similar tokens
+            continue
+        for similar_token in similar:
+            # assigns the index (which is the lowest number) to all these tokens
+            vocab[similar_token] = index
+    return vocab
+
 # TODO create_string_distance_vocab
+
+# TODO eigen Levenshtein en Damerau-Levenshtein algoritmes implementeren want strsimpy is fucking traag
 
 # TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
