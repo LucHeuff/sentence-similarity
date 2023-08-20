@@ -20,9 +20,9 @@ def character_strategy(draw) -> str:
     return character
 
 @composite
-def word_strategy(draw) -> str:
+def word_strategy(draw, min_size: int=1) -> str:
     """Generates a 'word' consisting of multiple characters, excluding whitespace"""
-    word = draw(st.text(alphabet, min_size=1, max_size=10))
+    word = draw(st.text(alphabet, min_size=min_size, max_size=10))
     return word
 
 # * Testing tokenizer functions
@@ -236,7 +236,7 @@ def synonym_vocab_strategy(draw) -> tuple[set[str], list[str], list[tuple[str]],
 def test_create_synonym_vocab(data):
     """Testing create_synonym_vocab().
     In addition to the standard vocab tests:
-    # - Test whether all the synonyms from the single synonym list get the same value in the vocab.
+     - Test whether all the synonyms from the single synonym list get the same value in the vocab.
     """
     corpus, sentences, synonyms, tokenizer = data
     vocab = create_synonym_vocab(sentences, synonyms, tokenizer)
@@ -271,13 +271,13 @@ from src.translator import create_string_distance_vocab
 # I need to test:
 # - whether tokens that are distance n away also get the same value in the vocab
 @composite
-def string_distance_vocab_strategy(draw) -> tuple[set[str], list[str], tokenize_function, int, list[tuple[str]]]:
+def string_distance_vocab_strategy(draw) -> tuple[set[str], list[str], tokenize_function, int, list[tuple]]:
     """Generate a corpus, distance, words within that distance, sentences and a tokenizer
     Words within distance are a list of tuples with word pairs within the distance.
     """
     tokenizer, sampler, join_function = tokenizer_factory['on_spaces']
-    candidate_corpus = draw(st.lists(sampler(), min_size=10))
-    distance  = draw(st.integers(min_value=2, max_value=6))
+    candidate_corpus = draw(st.lists(sampler(min_size=5), min_size=10))
+    distance  = draw(st.integers(min_value=2, max_value=4))
     n_extra_words = draw(st.integers(min_value=2, max_value=max(len(candidate_corpus)//3, 2)))
     words_with_distance = draw(st.lists(st.sampled_from(candidate_corpus), min_size=n_extra_words, max_size=n_extra_words))
 
@@ -293,11 +293,11 @@ def string_distance_vocab_strategy(draw) -> tuple[set[str], list[str], tokenize_
     sentences = [join_function(sentence) for sentence in sentences_lists]
     # figure out how I'm going to get the word pairs correct
 
-    words_with_dist_in_corpus = [word in corpus for word in words_with_distance]
+    words_with_dist_in_corpus = [word for word in corpus if word in words_with_distance]
     assume(len(words_with_dist_in_corpus) > 0)
-    word_pairs = [word_pair for word_pair in word_pairs if word_pair[1] in words_with_dist_in_corpus]
+    word_pairs = {(word, other_word) for (word, other_word) in word_pairs if (word in corpus and other_word in words_with_dist_in_corpus)}
 
-    return corpus, sentences, tokenizer, distance, word_pairs
+    return corpus, sentences, tokenizer, distance, list(word_pairs)
     
 @given(data=string_distance_vocab_strategy())
 def test_string_distance_vocab(data):

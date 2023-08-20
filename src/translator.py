@@ -98,26 +98,13 @@ def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str
     Returns:
         dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
     """
-    tokens = _tokenize_sentences(sentences, tokenizer)  # extracting unique tokens from sentences
+    tokens = sorted(_tokenize_sentences(sentences, tokenizer))  # extracting unique tokens from sentences
     vocab = {token: i for (i, token) in enumerate(tokens)} # enumerating these into a dictionary
     return vocab
 
 
 def create_synonym_vocab(sentences: list[str], synonyms: list[tuple[str]], tokenizer: tokenize_function) -> dict[str, int]:
-    """Creates a vocabulary dictionary where synymous tokens receive the same value in the vocab.
-
-    Args:
-        sentences (list[str]): _description_
-        synonyms (list[tuple]): _description_
-        tokenizer (tokenize_function): _description_
-
-    Raises:
-        ValueError: _description_
-
-    Returns:
-        dict[str, int]: _description_
-    """
-    tokens = _tokenize_sentences(sentences, tokenizer) # extracting unique tokens from sentences
+    tokens = sorted(_tokenize_sentences(sentences, tokenizer)) # extracting unique tokens from sentences
     # flatting the list of synonym tuples so it's easier to check if tokens appear in them
     all_synonym_tokens = [synonym for synonym_list in synonyms for synonym in synonym_list]
     # throwing an exception if any of the tokens provided in synonyms does not appear in the tokens derived from sentences
@@ -134,32 +121,26 @@ def create_string_distance_vocab(
         sentences: list[str],
         distance: int, 
         tokenizer: tokenize_function=tokenize_on_spaces, 
-        string_distance: StringDistance=Levenshtein(),
-        ):
+        distance_function: StringDistance=Levenshtein(),
+        ) -> dict[str, int]:
     vocab = create_vocab(sentences, tokenizer)
-    tokens = np.asarray(list(vocab.keys())) # tokens to np array for direct indexing
+    tokens = np.asarray(list(vocab.keys()))
 
     # Tokens are in the order of the number they receive from the vocabulary.
     # This means that when the tokens are enumerated, I can use the ordering to optimise things a bit.
-    # Which is not a luxury, this stuff is really slow. TODO fix these algorithms myself?
+    # Which is not a luxury, this stuff is really slow. 
 
-    for index, key in enumerate(tokens):
-        # The number is assumed to be the same as the index. If it is not, we have previously changed this number and can skip this key.
-        if vocab[key] < index:
-            continue
-        # I only need to look from this token (given by index) onwards, not backwards, which speeds things up substantially
-        close_tokens = [string_distance.distance(key, token) < distance for token in tokens[index:]]
-        # reading out the similar tokens
+    for index, token in enumerate(tokens, start=1):
+        close_tokens = [distance_function.distance(token, other_token) <= distance for other_token in tokens[index:]]
+        # reading out similar tokens
         similar = tokens[index:][close_tokens]
-        if len(similar) < 1: # skipping if there were no similar tokens
-            continue
         for similar_token in similar:
-            # assigns the index (which is the lowest number) to all these tokens
-            vocab[similar_token] = index
+            vocab[similar_token] = vocab[token]
+        
     return vocab
 
-# TODO create_string_distance_vocab
-
-# TODO eigen Levenshtein en Damerau-Levenshtein algoritmes implementeren want strsimpy is fucking traag
+def merge_vocabs(vocab: dict[str, int], other_vocab: dict[str, int]):
+    pass
+# TODO fix docstrings
 
 # TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
