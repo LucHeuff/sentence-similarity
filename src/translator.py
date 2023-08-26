@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable, Protocol
+from typing import Callable
 from strsimpy.string_distance import StringDistance
 from strsimpy.levenshtein import Levenshtein
 
@@ -7,8 +7,8 @@ class IllegalArgumentError(ValueError):
     pass
 
 tokenize_function = Callable[[str], list[str]]
+# ---- Creating basic tokenizers ----
 
-# * Creating basic tokenizers
 def tokenize_on_spaces(sentence: str) -> list[str]:
     """Separates out tokens in the sentence based on whitespaces
 
@@ -30,6 +30,8 @@ def tokenize_characters(sentence: str) -> list[str]:
         list[str]: list of string tokens
     """
     return list(sentence)
+
+# ---- Translator ----
 
 class Translator:
     """Base class for Translators
@@ -54,8 +56,7 @@ class Translator:
         return max(self.vocab.values()) + 1 # Adding one since arrays start at 0
     
 
-# * Default Translator factory
-
+#  Default Translator factory
 def create_default_translator(sentences: list[str], tokenizer: tokenize_function=tokenize_on_spaces) -> Translator:
     """Creates a default translator from a list of sentences and a tokenizer function
 
@@ -69,7 +70,7 @@ def create_default_translator(sentences: list[str], tokenizer: tokenize_function
     vocab = create_vocab(sentences, tokenizer)
     return Translator(tokenizer, vocab)
 
-# * Functions for creating vocabs
+# ---- Functions for creating vocabs ---- 
 
 def _tokenize_sentences(sentences: list[str], tokenizer: tokenize_function) -> set[str]:
     """Helper function that converts sentences into a set of unique tokens
@@ -93,7 +94,7 @@ def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str
 
     Args:
         sentences (list[str]): list of sentences in the form of strings
-        tokenizer (TokenizeFunction): function to perform tokenization on the sentences.
+        tokenizer (tokenize_function): function that performs tokenization on sentences.
 
     Returns:
         dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
@@ -104,6 +105,20 @@ def create_vocab(sentences: list[str], tokenizer: tokenize_function) -> dict[str
 
 
 def create_synonym_vocab(sentences: list[str], synonyms: list[tuple[str]], tokenizer: tokenize_function) -> dict[str, int]:
+    """Creates a vocabulary dictionary which pairs tokens to integers.
+    Allows passing in lists of synonyms which translate to the same integer.
+
+    Args:
+        sentences (list[str]): list of sentences in the form strings 
+        synonyms (list[tuple[str]]): list of tuples, where each tuple is filled with all the words that are synonyms of each other 
+        tokenizer (tokenize_function): function that performs tokenization on sentences.
+
+    Raises:
+        ValueError: when there are tokens in a synonym tuple that do not appear in the sentences.
+
+    Returns:
+        dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
+    """
     tokens = sorted(_tokenize_sentences(sentences, tokenizer)) # extracting unique tokens from sentences
     # flatting the list of synonym tuples so it's easier to check if tokens appear in them
     all_synonym_tokens = [synonym for synonym_list in synonyms for synonym in synonym_list]
@@ -123,8 +138,21 @@ def create_string_distance_vocab(
         tokenizer: tokenize_function=tokenize_on_spaces, 
         distance_function: StringDistance=Levenshtein(),
         ) -> dict[str, int]:
+    """Creates a vocabulary dictionary which pairs tokens to integers.
+    Translates tokens that are within the same string distance of one another to the same integer.
+    NOTE: should not be used with the tokenize_characters tokenizer!
+
+    Args:
+        sentences (list[str]): list of sentences in the form of strings
+        distance (int): distance at which strings are assumed to be the same.
+        tokenizer (tokenize_function, optional): Function that performs tokenization on sentences. Defaults to tokenize_on_spaces.
+        distance_function (StringDistance, optional): strsimpy StringDistance class to measure string distance. Defaults to Levenshtein().
+
+    Returns:
+        dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
+    """
     vocab = create_vocab(sentences, tokenizer)
-    tokens = np.asarray(list(vocab.keys()))
+    tokens = np.asarray(list(vocab.keys())) # as numpy array so I can easily index into it
 
     # Tokens are in the order of the number they receive from the vocabulary.
     # This means that when the tokens are enumerated, I can use the ordering to optimise things a bit.
@@ -196,4 +224,3 @@ def merge_vocabs(vocab: dict[str, int], other_vocab: dict[str, int]) -> dict[str
     vocab = {token: i for (i, tokens) in enumerate(tokens_lists) for token in tokens}
     return vocab 
 
-# TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
