@@ -7,46 +7,45 @@ from hypothesis.strategies import composite
 from hypothesis.extra.numpy import arrays
 from pytest import raises
 
-from src.sentence_similarity import _numericalize, _one_hot_sentence, _weight_matrix, _einsum, _to_dataframe, sentence_similarity
 from src.translator import create_default_translator, tokenize_function, tokenize_on_spaces, tokenize_characters
 
 tokenizers = [tokenize_on_spaces, tokenize_characters]
+alphabet = string.ascii_letters + string.digits + string.punctuation.replace("\\", "")
 
 WORD_LENGTH = 20
 VOCAB_LENGTH = 15
 SENTENCE_LENGTH = 10
 
-# TODO rewrite tests for updates Translator and sentence_similarity()
+# Nomenclature:
+# - a generator is a sampler that is meant to be reused in multiple places, but not directly as a strategy for a test.
+# - a strategy is a sampler that is bespoke to a function test. Strategies can output multiple objects.
 
-# TODO remove code that is commented out
-
-# * General strategies
-
-alphabet = string.ascii_letters + string.digits + string.punctuation.replace("\\", "")
+# ---- standard generators -----
 
 @composite
-def word(draw) -> str:
+def word_generator(draw) -> str:
     """Generates a single 'word' that is not allowed to be only empty spaces"""
     word = draw(st.text(alphabet, min_size=1, max_size=WORD_LENGTH))
     # assume(word != " ") # words are not allowed to be spaces 
     return word
 
 @composite
-def sentence(draw) -> str:
+def sentence_generator(draw) -> str:
     """Generates a sentence of one or more 'words"""
-    words = draw(st.lists(word(), min_size=1)) 
+    words = draw(st.lists(word_generator(), min_size=1)) 
     sentence = " ".join(words)
     # assume(sentence != "") # not allowed to be empty, I'm just assuming sentences are never empty
     return sentence
 
-# * Testing numericalization
+# ---- Testing numericalization ----
+from src.sentence_similarity import _numericalize
 
 @composite
-def sentences(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH) -> list[str]:
+def sentences_generator(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH) -> list[str]:
     """Generate a list of unique sentences"""
-    return draw(st.lists(sentence(), min_size=min_length, max_size=max_length, unique=True))
+    return draw(st.lists(sentence_generator(), min_size=min_length, max_size=max_length, unique=True))
 
-@given(sentences=sentences(), method=st.sampled_from(tokenizers))
+@given(sentences=sentences_generator(), method=st.sampled_from(tokenizers))
 def test_numericalize(sentences, method):
     """
      - Test whether sentences are converted to numpy.ndarrays
@@ -57,24 +56,17 @@ def test_numericalize(sentences, method):
     assert all(isinstance(sentence, np.ndarray) for sentence in numericalized)
     assert len(numericalized) == len(sentences)
 
-
-# * Testing one-hot encoding
-# - Test if the one-hot-encoded matrix has dimensions of (vocab_length, max_sentence_length)
-# - Test if the correct index in each column is one-hot-encoded
-
-# @composite
-# def numbered_sentence(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> np.ndarray:
-#     nums = draw(lists(integers(min_value=0, max_value=vocab_length), min_size=min_length, max_size=max_length)) # max value should not be too high for flaky tests
-#     return np.asarray(nums)
+# ---- Testing one-hot encoding ----
+from src.sentence_similarity import _one_hot_sentence
 
 @composite
-def numbered_sentence(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> np.ndarray:
+def numbered_sentence_generator(draw, min_length: int=1, max_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> np.ndarray:
     """Generates a 'sentence' as a list of numbers as a np.ndarray"""
     nums = st.integers(min_value=0, max_value=vocab_length)
     length = draw(st.integers(min_value=min_length, max_value=max_length))
     return draw(arrays(dtype=np.int64, shape=length, elements=nums))
 
-@given(num_sentence=numbered_sentence())
+@given(num_sentence=numbered_sentence_generator())
 def test_one_hot_sentence(num_sentence: np.ndarray):
     """
     - Test if the one-hot-encoded matrix has dimensions of (vocab_length, max_sentence_length)
@@ -88,7 +80,8 @@ def test_one_hot_sentence(num_sentence: np.ndarray):
     assert encoded.shape == (vocab_length, max_sentence_length)
     assert np.array_equal(num_sentence, encoded.argmax(axis=0))
 
-# * Testing weight matrix
+# ---- Testing weight matrix -----
+from src.sentence_similarity import _weight_matrix
 
 @given(
     size=st.integers(min_value=2, max_value=10),
@@ -122,27 +115,27 @@ def test_weight_matrix_exception(size: int, min: float):
         _weight_matrix(size, min)
 
 
-# * Testing einsum
-
+# ---- Testing einsum ----
+from src.sentence_similarity import _einsum
 
 @composite
-def numbered_sentences(draw, sentence_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> list[np.ndarray]:
+def numbered_sentences_generator(draw, sentence_length: int=SENTENCE_LENGTH, vocab_length: int=VOCAB_LENGTH) -> list[np.ndarray]:
     """Generate a list of 'numbered_sentence's"""
     size = sentence_length
-    return draw(st.lists(numbered_sentence(min_length=size, max_length=size, vocab_length=vocab_length), min_size=2))
+    return draw(st.lists(numbered_sentence_generator(min_length=size, max_length=size, vocab_length=vocab_length), min_size=2))
 
 @composite
-def einsum_data(draw) -> tuple[list[np.ndarray], int, int]:
+def einsum_strategy(draw) -> tuple[list[np.ndarray], int, int]:
     """Generates a list of numbered sentences, a vocab length and a sentence length for testing einsum calculations    
     """
     vocab_length = draw(st.integers(min_value=1, max_value=30))
     sentence_length = draw(st.integers(min_value=2, max_value=30))
-    sentences = draw(numbered_sentences(sentence_length=sentence_length, vocab_length=vocab_length))
+    sentences = draw(numbered_sentences_generator(sentence_length=sentence_length, vocab_length=vocab_length))
     assume(sentences != []) # Assuming sentences are not empty because they are annoying
     return sentences, vocab_length + 1, sentence_length
 
 # somewhat more of an integeration test but generating the right tensors is really annoying
-@given(einsum_data())
+@given(einsum_strategy())
 def test_einsum(data: tuple[list[np.ndarray], int, int]):
     """Pseudo-integration test of einsum
     - Test whether the einsum result has the correct shape
@@ -163,18 +156,15 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]):
     assert einsum.min() >= 0
 
 
-# * Testing to_dataframe
-# - Test whether the dataframe has the correct shape
-# - Test whether the correct columns are present
-# - Test whether all the sentences are present in both [sentence] and [other_sentence] columns
-# - Test whether similarity scores end up in the correct place
+# ---- Testing to_dataframe ----
+from src.sentence_similarity import _to_dataframe
 
 @composite
-def dataframe_data(draw) -> tuple[list[str], np.ndarray]:
+def dataframe_strategy(draw) -> tuple[list[str], np.ndarray]:
     """Generates fake einsum output that can be converted to a dataframe.
     Allows testing whether the right values also end up in the right places
     """
-    sents = draw(sentences(min_length=2))
+    sents = draw(sentences_generator(min_length=2))
     # Generating a fake einsum matrix
     data = draw(arrays(
         dtype=np.float64,
@@ -183,7 +173,7 @@ def dataframe_data(draw) -> tuple[list[str], np.ndarray]:
         unique=True))
     return sents, data
 
-@given(dataframe_data())
+@given(dataframe_strategy())
 def test_to_dataframe(data: tuple[list[str], np.ndarray]):
     """
     - Test whether the dataframe has the correct shape
@@ -209,10 +199,11 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray]):
         assert row.similarity.values == similarity[i, j]
 
 
-# * integration test of sentence_similarity
+# ---- integration test of sentence_similarity ----
+from src.sentence_similarity import sentence_similarity
 
 @given(
-    sentences=sentences(),
+    sentences=sentences_generator(),
     tokenizer=st.sampled_from(tokenizers),
     weight_matrix_min=st.floats(min_value=0, max_value=0.999)
 )
