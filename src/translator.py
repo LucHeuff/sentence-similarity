@@ -139,8 +139,61 @@ def create_string_distance_vocab(
         
     return vocab
 
-def merge_vocabs(vocab: dict[str, int], other_vocab: dict[str, int]):
-    pass
-# TODO fix docstrings
+
+def _restack_vocab(vocab: dict[str, int]) -> list[list[str]]:
+    """Converts vocab into a list of lists, where tokens that get encoded to the same number are in the same list."""
+    # This looks clunky, but preallocating empty lists doesn't work because the empty list all point to the same place in memory
+    # Hence everythin would get appended to the same list (:
+    tokens = []
+    for token, i in vocab.items():
+        try:
+            tokens[i].append(token)
+        except IndexError:
+            tokens.insert(i, [token])
+
+    return tokens
+
+def merge_vocabs(vocab: dict[str, int], other_vocab: dict[str, int]) -> dict[str, int]:
+    """Convencience function allowing to merge multiple vocabs with one another.
+    This also makes sure that synonyms or tokens within a string distance are translated to the same integer
+
+    Args:
+        vocab (dict[str, int]): vocab to be merged with other_vocab
+        other_vocab (dict[str, int]): to be merged with vocab
+
+    Returns:
+        dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
+    """
+    unique_tokens  = set(list(vocab.keys()) + list(other_vocab.keys()))
+
+    # getting lists of tokens that get the same value from their vocabs 
+    vocab_tokens_lists = _restack_vocab(vocab)
+    other_vocab_tokens_lists = _restack_vocab(other_vocab)
+
+    tokens_lists = []
+    for token in unique_tokens:
+        # iterate over both lists separately and add the list whenever this token appears in it
+        token_set = set(token) 
+        for vocab_tokens in vocab_tokens_lists:
+            # if any of the tokens in token_set appears in vocab_tokens, add tokens in vocab_tokens to token_set
+            if any([t in vocab_tokens for t in token_set]): 
+                token_set = token_set.union(set(vocab_tokens)) 
+        for other_vocab_tokens in other_vocab_tokens_lists:
+            if any([t in other_vocab_tokens for t in token_set]):
+                token_set = token_set.union(set(other_vocab_tokens))
+        tokens_lists.append(tuple(token_set))
+
+    tokens_lists = set(tokens_lists)
+    # I should now have all the synonym tuples, but some tuples may be a subset of other tuples.
+    # So these still need to be removed.
+    iter_lists = tokens_lists.copy() # making a copy since I want to remove things from tokens_lists
+
+    for tokens_set in iter_lists:
+        if any([set(tokens_set).issubset(set(other_set)) and not tokens_set == other_set for other_set in iter_lists]):
+            tokens_lists.remove(tokens_set)
+
+    # use the same trick as in synonym_vocabs to create a new vocab
+    vocab = {token: i for (i, tokens) in enumerate(tokens_lists) for token in tokens}
+    return vocab 
 
 # TODO merge_vocabs() ? (instead of having to create tons of convenience functions?)
