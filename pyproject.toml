@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "sentence-similarity"
+version = "0.1.0"
+description = "Algorithm for fast comparison of string sentences"
+authors = ["Luc Heuff <lucheuff@hotmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.25.2"
+pandas = "^2.1.0"
+strsimpy = "^0.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+hypothesis = "^6.84.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
