@@ -9,9 +9,9 @@ from hypothesis.strategies import composite
 from pytest import raises
 
 from src.translator import (
+    TokenizeFunction,
     create_default_translator,
     tokenize_characters,
-    tokenize_function,
     tokenize_on_spaces,
 )
 
@@ -269,7 +269,7 @@ from src.sentence_similarity import sentence_similarity
     weight_matrix_min=st.floats(min_value=0, max_value=0.999),
 )
 def test_sentence_similarity(
-    sentences: list[str], tokenizer: tokenize_function, weight_matrix_min: float
+    sentences: list[str], tokenizer: TokenizeFunction, weight_matrix_min: float
 ):
     """Integration test of sentence similarity:
     # - Test whether similarity data frame has the correct shape
