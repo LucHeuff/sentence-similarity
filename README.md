@@ -57,7 +57,7 @@ It will split the sentences using the provided tokenizer (`tokenize_words` if yo
 will create a vocabulary from all those tokens.
 
 If you want to use a different vocabulary, you can use the `create_translator(tokenizer, vocab)` convenience function
-to create a custom Translator and pass it into the function using `sentence_similarity(sentences, translator=cusom_translator)`.
+to create a custom Translator and pass it into the function using `sentence_similarity(sentences, translator=custom_translator)`.
 
 Depending on the vocabulary generation method, the creation of the Translator can be very timeconsuming. In this case it
 is also recommended to create the Translator separately, and passing it as is into the `sentence_similarity` function.
