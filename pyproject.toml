@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sentence-similarity"
-version = "0.1.1"
+version = "1.0.0"
 description = "Algorithm for fast comparison of string sentences"
 authors = ["Luc Heuff <lucheuff@hotmail.com>"]
 license = "MIT"
