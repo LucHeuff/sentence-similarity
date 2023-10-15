@@ -81,9 +81,10 @@ The package contains three methods of creating vocabularies:
   This can be useful when there are typo's in your sentences.
   Note however that string distances can take a while to calculate!
 
-  ## Weight matrix
-  The algorithm uses a 'weight matrix' in order to discount tokens that match but are not in the same position in the sentence.
-  By default, the weight matrix ranges from 1 on the diagonal to 0.1 on the bottom-left and top-right corners, decreasing linearly
-  along the way. This behaviour can be customised by setting the `weight_matrix_min` value to a float between 0 and 1, for example:
-  `sentence_similarity(sentences, weight_matrix_min=0.5). Setting this value will change how the score responds to tokens that match
-  between sentences but are in different places. Setting the value to 1. disables discounting entirely. 
+## Weight matrix
+
+The algorithm uses a 'weight matrix' in order to discount tokens that match but are not in the same position in the sentence.
+By default, the weight matrix ranges from 1 on the diagonal to 0.1 on the bottom-left and top-right corners, decreasing linearly
+along the way. This behaviour can be customised by setting the `weight_matrix_min` value to a float between 0 and 1, for example:
+`sentence_similarity(sentences, weight_matrix_min=0.5). Setting this value will change how the score responds to tokens that match
+between sentences but are in different places. Setting the value to 1. disables discounting entirely.
