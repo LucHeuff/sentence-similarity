@@ -80,14 +80,14 @@ class Translator:
 
 #  Translator factories
 def create_default_translator(
-    sentences: list[str], tokenizer: TokenizeFunction = tokenize_on_spaces
+    sentences: list[str], tokenizer: TokenizeFunction = tokenize_words
 ) -> Translator:
     """Creates a default translator from a list of sentences and a tokenizer function
 
     Args:
         sentences (list[str]): list of sentences to be translated.
         tokenizer (tokenize_function, optional): function with which to perform
-                                   tokenization. Defaults to tokenize_on_spaces.
+                                   tokenization. Defaults to tokenize_words.
 
     Returns:
         Translator: object to perform translation from sentences to numericalised lists.
@@ -192,7 +192,7 @@ def create_synonym_vocab(
 def create_string_distance_vocab(
     sentences: list[str],
     distance: int,
-    tokenizer: TokenizeFunction = tokenize_on_spaces,
+    tokenizer: TokenizeFunction = tokenize_words,
     distance_function: StringDistance = Levenshtein(),
 ) -> dict[str, int]:
     """Creates a vocabulary dictionary which pairs tokens to integers.
@@ -203,7 +203,7 @@ def create_string_distance_vocab(
         sentences (list[str]): list of sentences in the form of strings
         distance (int): distance at which strings are assumed to be the same.
         tokenizer (tokenize_function, optional): Function that performs tokenization on sentences.
-                                                 Defaults to tokenize_on_spaces.
+                                                 Defaults to tokenize_words.
         distance_function (StringDistance, optional): strsimpy StringDistance class to measure
                                                     string distance. Defaults to Levenshtein().
 
