@@ -1,39 +1,50 @@
+import re
 from typing import Callable
 
 import numpy as np
 from strsimpy.levenshtein import Levenshtein
 from strsimpy.string_distance import StringDistance
 
-
-class IllegalArgumentError(ValueError):
-    pass
-
-
 TokenizeFunction = Callable[[str], list[str]]
 
 # ---- Creating basic tokenizers ----
+
+
+def tokenize_words(sentence: str) -> list[str]:
+    """Separates out tokens in sentence based on whitespaces.
+    Will tokenize punctuation as a separate token, even if they are
+    directly connected to a word.
+
+    Args:
+        sentence: string to be separated into tokens
+
+    Returns:
+        list of string tokens
+    """
+    sentence = re.sub(r"([^a-zA-Z\d\s])", "  \\1", sentence)
+    return sentence.split()
 
 
 def tokenize_on_spaces(sentence: str) -> list[str]:
     """Separates out tokens in the sentence based on whitespaces
 
     Args:
-        sentence (str): string to be separated into tokens
+        sentence: string to be separated into tokens
 
     Returns:
-        list[str]: list of string tokens
+        list of string tokens
     """
     return sentence.split()
 
 
 def tokenize_characters(sentence: str) -> list[str]:
-    """Separates each characters in the sentence as a separate token
+    """Separates out each characters as a separate token
 
     Args:
-        sentence (str): string to be separated into tokens
+        sentence: string to be separated into tokens
 
     Returns:
-        list[str]: list of string tokens
+        list of string tokens
     """
     return list(sentence)
 
@@ -67,7 +78,7 @@ class Translator:
         return max(self.vocab.values()) + 1  # Adding one since arrays start at 0
 
 
-#  Default Translator factory
+#  Translator factories
 def create_default_translator(
     sentences: list[str], tokenizer: TokenizeFunction = tokenize_on_spaces
 ) -> Translator:
@@ -82,6 +93,19 @@ def create_default_translator(
         Translator: object to perform translation from sentences to numericalised lists.
     """
     vocab = create_vocab(sentences, tokenizer)
+    return Translator(tokenizer, vocab)
+
+
+def create_translator(vocab: dict[str, int], tokenizer: TokenizeFunction):
+    """Convenience function that creates a Translator, given a vocab and a tokenizer
+
+    Args:
+        vocab: the desired vocab for the translator
+        tokenizer: the desired tokenizer for the translator
+
+    Returns:
+        A Translator instance using the provided tokenizer and vocab
+    """
     return Translator(tokenizer, vocab)
 
 

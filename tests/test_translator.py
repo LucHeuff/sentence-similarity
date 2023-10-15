@@ -1,13 +1,15 @@
 import string
+from itertools import chain
 from typing import Callable
 
 import hypothesis.strategies as st
 from hypothesis import assume, given
 from hypothesis.strategies import composite
+from pandas.core.construction import com
 from pytest import raises
 
-PUNCTUATION = string.punctuation.replace("\\", "")
-ALPHABET = string.ascii_letters + string.digits + PUNCTUATION
+PUNCTUATION = string.punctuation.replace("[\\]", "")
+ALPHABET = string.ascii_letters + string.digits
 WHITESPACE = string.whitespace
 
 # Nomenclature:
@@ -22,7 +24,9 @@ Sampler = Callable[[], st.SearchStrategy[str]]
 @composite
 def character_generator(draw) -> str:
     """Generates a single character, including WHITESPACE"""
-    character = draw(st.text(ALPHABET + WHITESPACE, min_size=1, max_size=1))
+    character = draw(
+        st.text(ALPHABET + WHITESPACE + PUNCTUATION, min_size=1, max_size=1)
+    )
     return character
 
 
@@ -33,12 +37,19 @@ def word_generator(draw, min_size: int = 1) -> str:
     return word
 
 
+@composite
+def punctuation_generator(draw) -> str:
+    """Generates a single character of punctuation"""
+    punctuation = draw(st.text(PUNCTUATION, min_size=1, max_size=1))
+    return punctuation
+
+
 # ---- Testing tokenizer functions ----
-from src.translator import tokenize_characters, tokenize_on_spaces
+from src.translator import tokenize_characters, tokenize_on_spaces, tokenize_words
 
 
 @composite
-def tokenize_word_strategy(draw) -> tuple[list[str], str]:
+def tokenize_on_spaces_strategy(draw) -> tuple[list[str], str]:
     """Generates a set of words and combines those words into a sentence with a WHITESPACE.
     Allows testing whether tokenization correctly recovers the words that went into the sentence.
     """
@@ -47,8 +58,8 @@ def tokenize_word_strategy(draw) -> tuple[list[str], str]:
     return words, sentence
 
 
-@given(data=tokenize_word_strategy())
-def test_tokenize_on_spaces(data):
+@given(data=tokenize_on_spaces_strategy())
+def test_tokenize_on_spaces(data: tuple[list[str], str]):
     """Testing whether tokenizing on spaces returns the words that went into the sentence"""
     words, sentence = data
     assert tokenize_on_spaces(sentence) == words
@@ -67,12 +78,39 @@ def tokenize_character_strategy(draw) -> tuple[list[str], str]:
 
 
 @given(data=tokenize_character_strategy())
-def test_tokenize_characters(data: dict):
+def test_tokenize_characters(data: tuple[list[str], str]):
     """Testing whether tokenizing on characters returns the charactes that went into the sentence"""
     characters, sentence = data
-    assert (
-        tokenize_characters(sentence) == characters
-    )  # testing whether the tokenizer returns each character
+    # testing whether the tokenizer returns each character
+    assert tokenize_characters(sentence) == characters
+
+
+@composite
+def tokenize_words_strategy(draw) -> tuple[list[str], str]:
+    """Generates a set of words, and puts random punctuation behind each word.
+    Allows testing whether tokenize_words correctly splits off punctuation
+    """
+    words = draw(st.lists(word_generator(), min_size=1))
+    # putting punctuation after each word, easiest test
+    punctuation = draw(
+        st.lists(punctuation_generator(), min_size=len(words), max_size=len(words))
+    )
+    # making the list of tokens as I expect them to be returned
+    tokens = list(chain(*zip(words, punctuation)))
+    # making a list of tokens where the punctuation is pasted right behind the word
+    tokens_into_sentence = [
+        "".join([word, punct]) for (word, punct) in zip(words, punctuation)
+    ]
+    sentence = " ".join(tokens_into_sentence)
+    return tokens, sentence
+
+
+@given(data=tokenize_words_strategy())
+def test_tokenize_words(data: tuple[list[str], str]):
+    """Testing whether tokenizing on words returns the words and
+    punctuation that went into the sentence"""
+    tokens, sentence = data
+    assert tokenize_words(sentence) == tokens
 
 
 # ---- Testing Translator ----
