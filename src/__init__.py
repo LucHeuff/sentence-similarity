@@ -1,4 +1,4 @@
-from src.sentence_similarity import sentence_similarity
+from src.sentence_similarity import TokenizeFunction, Translator, sentence_similarity
 from src.translator import (
     create_string_distance_vocab,
     create_synonym_vocab,
