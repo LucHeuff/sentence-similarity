@@ -1,3 +1,6 @@
+"""
+Contains sentence similarity main function and algorithm.
+"""
 from functools import partial
 from typing import Protocol
 

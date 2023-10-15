@@ -1,3 +1,4 @@
+"""Contains tests for translator.py"""
 import string
 from itertools import chain
 from typing import Callable
@@ -5,7 +6,6 @@ from typing import Callable
 import hypothesis.strategies as st
 from hypothesis import assume, given
 from hypothesis.strategies import composite
-from pandas.core.construction import com
 from pytest import raises
 
 PUNCTUATION = string.punctuation.replace("[\\]", "")

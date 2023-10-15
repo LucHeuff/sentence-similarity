@@ -1,3 +1,4 @@
+"""Provides easier package interface"""
 from sentence_similarity.sentence_similarity import (
     TokenizeFunction,
     Translator,

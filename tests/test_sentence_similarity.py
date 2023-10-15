@@ -1,3 +1,4 @@
+"""Contains tests for sentence_similarity.py"""
 import itertools
 import string
 
