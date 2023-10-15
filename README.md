@@ -77,6 +77,6 @@ The package contains three methods of creating vocabularies:
   These synonyms are all translated to the same integer value.
 - `create_string_distance_vocab(sentences, distance, tokenizer, distance_function)`: This allows for all tokens that are
   within `distance: int` from each other based on a `distance_function` (assumed to be a `StringDistance` function from
-  the `[strsimpy](https://github.com/luozhouyang/python-string-similarity)` package, defaults to `Levenshtein`).
+  the [strsimpy](https://github.com/luozhouyang/python-string-similarity) package, defaults to `Levenshtein`).
   This can be useful when there are typo's in your sentences.
   Note however that string distances can take a while to calculate!
