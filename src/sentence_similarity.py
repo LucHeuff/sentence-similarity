@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 
 from src.translator import (
+    TokenizeFunction,
     create_default_translator,
-    tokenize_function,
     tokenize_on_spaces,
 )
 
@@ -28,7 +28,7 @@ EINSUM_OPT = "optimal"
 
 def sentence_similarity(
     sentences: list[str],
-    tokenizer: tokenize_function = tokenize_on_spaces,
+    tokenizer: TokenizeFunction = tokenize_on_spaces,
     translator: Translator | None = None,
     weight_matrix_min: float = 0.1,
 ) -> pd.DataFrame:
@@ -36,7 +36,7 @@ def sentence_similarity(
 
     Args:
         sentences (list[str]): list of sentences to be compared to each other in the form of strings
-        tokenizer (tokenize_function, optional): function to perform tokenization.
+        tokenizer (TokenizeFunction, optional): function to perform tokenization.
                  Also allows providing custom tokenization function. Defaults to tokenize_on_spaces.
         translator (Translator | None, optional): Translator object that performs sentence encoding.
                                  Also allows providing a custom Translator object. Defaults to None.
