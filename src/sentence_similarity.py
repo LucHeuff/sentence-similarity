@@ -8,6 +8,7 @@ from src.translator import (
     TokenizeFunction,
     create_default_translator,
     tokenize_on_spaces,
+    tokenize_words,
 )
 
 
@@ -28,7 +29,7 @@ EINSUM_OPT = "optimal"
 
 def sentence_similarity(
     sentences: list[str],
-    tokenizer: TokenizeFunction = tokenize_on_spaces,
+    tokenizer: TokenizeFunction = tokenize_words,
     translator: Translator | None = None,
     weight_matrix_min: float = 0.1,
 ) -> pd.DataFrame:
