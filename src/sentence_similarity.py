@@ -4,12 +4,7 @@ from typing import Protocol
 import numpy as np
 import pandas as pd
 
-from src.translator import (
-    TokenizeFunction,
-    create_default_translator,
-    tokenize_on_spaces,
-    tokenize_words,
-)
+from src.translator import TokenizeFunction, create_default_translator, tokenize_words
 
 
 class Translator(Protocol):
