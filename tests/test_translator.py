@@ -45,7 +45,11 @@ def punctuation_generator(draw) -> str:
 
 
 # ---- Testing tokenizer functions ----
-from src.translator import tokenize_characters, tokenize_on_spaces, tokenize_words
+from sentence_similarity.translator import (
+    tokenize_characters,
+    tokenize_on_spaces,
+    tokenize_words,
+)
 
 
 @composite
@@ -114,7 +118,7 @@ def test_tokenize_words(data: tuple[list[str], str]):
 
 
 # ---- Testing Translator ----
-from src.translator import TokenizeFunction, Translator
+from sentence_similarity.translator import TokenizeFunction, Translator
 
 JoinFunc = Callable[[list[str]], str]
 
@@ -228,7 +232,7 @@ def test_translator_too_large_value_vocab_assertion(tokenizer, too_large_vocab):
 
 
 # ---- Testing vocab and default translator creators ----
-from src.translator import create_default_translator, create_vocab
+from sentence_similarity.translator import create_default_translator, create_vocab
 
 
 @composite
@@ -318,7 +322,7 @@ def test_create_default_translator(data):
 
 
 # ---- Testing create_synonym_vocab() ----
-from src.translator import create_synonym_vocab
+from sentence_similarity.translator import create_synonym_vocab
 
 
 @composite
@@ -381,14 +385,15 @@ def synonym_exception_strategy(
 
 @given(data=synonym_exception_strategy())
 def test_synonym_vocab_exception(data):
-    """Testing whether create_synonym_vocab() correctly throws a value error when synonym tokens are provided that do not appear in the sentences."""
+    """Testing whether create_synonym_vocab() correctly throws a value error
+    when synonym tokens are provided that do not appear in the sentences."""
     sentences, synonyms, tokenizer = data
     with raises(ValueError):
         create_synonym_vocab(sentences, synonyms, tokenizer)
 
 
 # ---- Testing create_string_distance_vocab() ----
-from src.translator import create_string_distance_vocab
+from sentence_similarity.translator import create_string_distance_vocab
 
 
 @composite

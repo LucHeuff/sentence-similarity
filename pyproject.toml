@@ -5,6 +5,7 @@ description = "Algorithm for fast comparison of string sentences"
 authors = ["Luc Heuff <lucheuff@hotmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "sentence_similarity"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"

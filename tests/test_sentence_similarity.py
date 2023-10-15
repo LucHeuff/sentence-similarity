@@ -8,7 +8,7 @@ from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import composite
 from pytest import raises
 
-from src.translator import (
+from sentence_similarity.translator import (
     TokenizeFunction,
     create_default_translator,
     tokenize_characters,
@@ -49,7 +49,7 @@ def sentence_generator(draw) -> str:
 
 
 # ---- Testing numericalization ----
-from src.sentence_similarity import _numericalize
+from sentence_similarity.sentence_similarity import _numericalize
 
 
 @composite
@@ -77,7 +77,7 @@ def test_numericalize(sentences, method):
 
 
 # ---- Testing one-hot encoding ----
-from src.sentence_similarity import _one_hot_sentence
+from sentence_similarity.sentence_similarity import _one_hot_sentence
 
 
 @composite
@@ -111,7 +111,7 @@ def test_one_hot_sentence(num_sentence: np.ndarray):
 
 
 # ---- Testing weight matrix -----
-from src.sentence_similarity import _weight_matrix
+from sentence_similarity.sentence_similarity import _weight_matrix
 
 
 @given(
@@ -150,7 +150,7 @@ def test_weight_matrix_exception(size: int, min: float):
 
 
 # ---- Testing einsum ----
-from src.sentence_similarity import _einsum
+from sentence_similarity.sentence_similarity import _einsum
 
 
 @composite
@@ -212,7 +212,7 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]):
 
 
 # ---- Testing to_dataframe ----
-from src.sentence_similarity import _to_dataframe
+from sentence_similarity.sentence_similarity import _to_dataframe
 
 
 @composite
@@ -260,7 +260,7 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray]):
 
 
 # ---- integration test of sentence_similarity ----
-from src.sentence_similarity import sentence_similarity
+from sentence_similarity.sentence_similarity import sentence_similarity
 
 
 @given(
