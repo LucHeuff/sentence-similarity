@@ -4,15 +4,21 @@ This package contains an algorithm which calculates a metric of comparability be
 The package allows for many sentneces to be compared amongst each other quickly (depending on available hardware).
 
 # Installation
+
 The package can be installed using `pip`:
+
 ```
 pip install git+https://github.com/LucHeuff/sentence-similarity.git
 ```
+
 or using [`poetry`](https://python-poetry.org/):
+
 ```
 poetry install git+https://github.com/LucHeuff/sentence-similarity.git
 ```
+
 or by adding it to `pyproject.toml`:
+
 ```
 [tool.poetry.dependencies]
 sentence-similarity = { git = "https://github.com/LucHeuff/sentence-similarity.git" }
@@ -24,7 +30,7 @@ The main function of the package is `sentence_similarity(sentences)`, which calc
 possible combinations of `sentences` (which needs to be a list of strings).
 The similarity score ranges from 0 when the two sentences have no tokens in common, to 1 if the sentences exactly match,
 to larger than 1 if one of the sentences is a subset of another sentence, or if tokens are repeated in either of the sentences.
-If sentences have some but not all tokens in common, or common tokens that are not in the same places in the sentence, the score is between 0 and 1. 
+If sentences have some but not all tokens in common, or common tokens that are not in the same places in the sentence, the score is between 0 and 1.
 
 **Note** that 'similarity' should be interpreted as tokens directly matching between two sentences.
 The algorithm does not take synonyms into account out of the box (though you can add them manually with `create_synonym_vocab`)
@@ -54,6 +60,7 @@ def custom_tokenizer(sentence: str) -> list[str]:
     # your code goes here
     return tokens
 ```
+
 and pass it into the main function using `sentence_similarity(sentences, tokenizer=custom_tokenizer)`.
 
 By default, `sentence_similarity(sentences)` will use the `tokenize_words` tokenizer.
@@ -85,13 +92,13 @@ can be used, so you can provide your own, as long as the **smallest integer is 0
 
 The package contains three methods of creating vocabularies:
 
-- `create_vocab(sentences, tokenizer)`:   
+- `create_vocab(sentences, tokenizer)`:  
   splits all sentences into tokens based on a provided `tokenizer` and gives each token a unique integer value.
-- `create_synonym_vocab(sentences, synonyms, tokenizer)`:   
+- `create_synonym_vocab(sentences, synonyms, tokenizer)`:  
   allows you to additionally pass in a list of tuples, where each tuple contains all the words that are synonyms of each other
   (e.g. `[('motor', 'engine'), ('car', 'van', 'SUV'), ...]`)
   Each token in a set of synonyms is translated to the same integer value.
-- `create_string_distance_vocab(sentences, distance, tokenizer, distance_function)`:   
+- `create_string_distance_vocab(sentences, distance, tokenizer, distance_function)`:  
   allows for tokens that are within `distance` from each other based on some `distance_function` to be translated to the same integer value.
   The `distance_function` is assumed to be a `StringDistance` function from the [`strsimpy`](https://github.com/luozhouyang/python-string-similarity) package (defaults to `Levenshtein`).
   This can be useful when there may be typo's in your sentences.
@@ -104,3 +111,5 @@ By default, the weight matrix ranges from 1 on the diagonal to 0.1 on the bottom
 along the way. The minimum value at the edges can be customised by setting the `weight_matrix_min` value to a float between 0 and 1, for example:
 `sentence_similarity(sentences, weight_matrix_min=0.5)`. Setting this value will change how the score responds to tokens that match
 between sentences but are in different places. Setting the value to 1. disables discounting entirely.
+If you alternatively want to ignore any tokens that are not in exactly the same position, you can use `sentence_similarity(sentences, weight_matrix_min='identity')` instead,
+which will set the weight matrix to an identity matrix.
