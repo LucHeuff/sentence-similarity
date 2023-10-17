@@ -33,29 +33,33 @@ def sentence_similarity(
     sentences: list[str],
     tokenizer: TokenizeFunction = tokenize_words,
     translator: Translator | None = None,
-    weight_matrix_min: float = 0.1,
+    weight_matrix_min: float | str = 0.1,
 ) -> pd.DataFrame:
-    """Compares sentences in the form of strings through a tokenisation method.
+    """
 
     Args:
-        sentences (list[str]): list of sentences to be compared to each other in the form of strings
-        tokenizer (TokenizeFunction, optional): function to perform tokenization. Allows providing
-                                                custom tokenization function.
-                                                This attribute is ignored when passing in
-                                                a Translator. Defaults to tokenize_words.
-        translator (Translator | None, optional): Translator object that performs sentence encoding.
-                                 Also allows providing a custom Translator object. Defaults to None.
-        weight_matrix_min (float, optional): The weight matrix discounts sentences that have the
-            same words, but in different places. This value controls the weight of the value that
-            is furthest out. You may wish to raise the value if using short sentences or a small
-            vocabulary. Defaults to 0.1.
+        sentences: list of sentences to be compared to each other
+        tokenizer: function that performs tokenisation, allows passing in custom tokenizer.
+                   Defaults to tokenize_words.
+        translator: Translator object, allows passing in custom instance. Generates default
+                    translator when left empty. Defaults to None.
+        weight_matrix_min: allows setting the extreme values of the weight matrix, which
+                           discounts words that match between sentences but are not in the
+                           same position. If float, must be between 0 and 1.
+                           Set to 'identity' if you want to ignore words that are not in
+                           the correct position entirely.
 
     Returns:
-        pd.DataFrame: containing each possible sentence pair and the corresponding similarity score.
-                      A similarity score of 1 indicates the sentences are the same. A score below 1
-                      means indicates a reduction in similarity. A score above 1 indicates that
-                      substrings in the sentence are repeated multiple times in the other sentence,
-                      which tends to happen more often when tokenizing characters.
+        A dataframe with columns (sentence, other_sentence, score) containing the paired
+        sentences and the calculated similarity score.
+        A score of 1 indicates the sentences are the same.
+        A score of 0 indicates the sentences have nothing in common.
+        A score between 0 and 1 is a measure for the similarity between the two sentences
+        A score larger than 1 indicates that some tokens are repeated in one or both sentences.
+
+    Raises:
+        ValueError: if a string is passed into weight_matrix_min that is not 'identity'.
+
     """
     # Creating vocabulary to translate sentences into numbers
     if translator is None:
@@ -65,6 +69,16 @@ def sentence_similarity(
     num_sentences = _numericalize(sentences, translator)
     max_sentence_length = max(len(sentence) for sentence in num_sentences)
 
+    # creating weight matrix as soon as possible since it might raise an exception
+    if weight_matrix_min == "identity":
+        weight_matrix = _weight_matrix(max_sentence_length, identity=True)
+    elif isinstance(weight_matrix_min, str):
+        raise ValueError(
+            f"weight_matrix_min should be float or 'identity', got {weight_matrix_min}"
+        )
+    else:
+        weight_matrix = _weight_matrix(max_sentence_length, weight_matrix_min)
+
     one_hot_encode = partial(
         _one_hot_sentence,
         vocab_length=vocab_length,
@@ -73,8 +87,6 @@ def sentence_similarity(
     one_hot_sentences = [one_hot_encode(sentence) for sentence in num_sentences]
 
     one_hot_tensor = np.stack(one_hot_sentences)
-    weight_matrix = _weight_matrix(max_sentence_length, weight_matrix_min)
-
     similarity = _einsum(one_hot_tensor, weight_matrix)
 
     return _to_dataframe(sentences, similarity)
@@ -131,24 +143,30 @@ def _one_hot_sentence(
     return one_hot
 
 
-def _weight_matrix(size: int, minimum: float) -> np.ndarray:
+def _weight_matrix(
+    size: int, minimum: float = 0.1, identity: bool = False
+) -> np.ndarray:
     """Generates a weight matrix to discount cases where words do appear in a pair of sentences,
     but in different positions in the sentence. This matrix has 1.'s on the diagonal, and reduce
     out the the provided minimum value to the top-right and bottom-left corners of the matrix.
 
     Args:
-        size (int): Determines the shape of the square matrix (size, size)
-        minimum (float): Determines the minimum value to enter into the weight matrix.
-                         Should be between 0. and 1. Setting this to 1 disables weight scaling.
+        size: Determines the shape of the square matrix (size, size)
+        minimum: Determines the minimum value to enter into the weight matrix.
+                 Should be between 0. and 1. Setting this to 1 disables weight scaling.
+                 Defaults to 0.1.
+        identity: sets the weight matrix to an identity matrix of shape (size, size)
+
+    Returns:
+        the weight matrix
 
     Raises:
         ValueError: When [minimum] is not between 0. and 1.
 
-    Returns:
-        np.ndarray: weight matrix of shape (size, size) with 1. on diagonal
-                    and lowering to [minimum] on towards the edges.
-    """
 
+    """
+    if identity:
+        return np.eye(size)
     if not 0 <= minimum <= 1:
         raise ValueError(
             f"""You are trying to set a minimum value for the weight matrix of {minimum},
@@ -161,6 +179,8 @@ def _weight_matrix(size: int, minimum: float) -> np.ndarray:
 
     weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
+
+    assert weight_matrix.shape == (size, size), "weight matrix has incorrect shape"
 
     return weight_matrix
 

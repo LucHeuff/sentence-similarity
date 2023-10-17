@@ -138,9 +138,8 @@ def test_weight_matrix(size: int, min: float):
 
 @given(
     size=st.integers(min_value=2, max_value=10),
-    min=st.floats().filter(
-        lambda x: not 0.0 <= x <= 1.0
-    ),  # generating floats outside of the range [0, 1]
+    # generating floats outside of the range [0, 1]
+    min=st.floats().filter(lambda x: not 0.0 <= x <= 1.0),
 )
 def test_weight_matrix_exception(size: int, min: float):
     """
@@ -148,6 +147,15 @@ def test_weight_matrix_exception(size: int, min: float):
     """
     with raises(ValueError):
         _weight_matrix(size, min)
+
+
+@given(size=st.integers(min_value=2, max_value=10))
+def test_weight_matrix_identity(size: int):
+    """
+    - Test if the weight matrix has the correct shape when identity is set to True
+    """
+    weight_matrix = _weight_matrix(size, identity=True)
+    assert np.array_equal(weight_matrix, np.eye(size))
 
 
 # ---- Testing einsum ----
