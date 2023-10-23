@@ -110,6 +110,6 @@ The algorithm uses a 'weight matrix' in order to discount tokens that match but 
 By default, the weight matrix ranges from 1 on the diagonal to 0.1 on the bottom-left and top-right corners, decreasing linearly
 along the way. The minimum value at the edges can be customised by setting the `weight_matrix_min` value to a float between 0 and 1, for example:
 `sentence_similarity(sentences, weight_matrix_min=0.5)`. Setting this value will change how the score responds to tokens that match
-between sentences but are in different places. Setting the value to 1. disables discounting entirely.
-If you alternatively want to ignore any tokens that are not in exactly the same position, you can use `sentence_similarity(sentences, weight_matrix_min='identity')` instead,
+between sentences but are in different places. Setting the value to 1. disables discounting entirely.    
+If you alternatively want to ignore any tokens that are not in exactly the same position between the two sentences, you can use `sentence_similarity(sentences, weight_matrix_min='identity')` instead,
 which will set the weight matrix to an identity matrix.
