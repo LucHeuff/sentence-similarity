@@ -2,7 +2,7 @@
 name = "sentence-similarity"
 version = "1.0.0"
 description = "Algorithm for fast comparison of string sentences"
-authors = ["Luc Heuff <lucheuff@hotmail.com>"]
+authors = ["Luc Heuff <10941592@LucHeuff@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "sentence_similarity"}]
