@@ -32,6 +32,8 @@ def sentence_similarity(
     tokenizer: TokenizeFunction = tokenize_words,
     translator: Translator | None = None,
     weight_matrix_min: float | str = 0.1,
+    *,
+    filter_identity: bool = True,
 ) -> pd.DataFrame:
     """Calculate similarity among provided sentences.
 
@@ -47,6 +49,7 @@ def sentence_similarity(
                            same position. If float, must be between 0 and 1.
                            Set to 'identity' if you want to ignore words that are not in
                            the correct position entirely.
+        filter_identity: whether cases where the sentence is compared to itself should be filtered out.
 
     Returns:
     -------
@@ -90,7 +93,7 @@ def sentence_similarity(
     one_hot_tensor = np.stack(one_hot_sentences)
     similarity = _einsum(one_hot_tensor, weight_matrix)
 
-    return _to_dataframe(sentences, similarity)
+    return _to_dataframe(sentences, similarity, filter_identity=filter_identity)
 
 
 def _numericalize(
@@ -231,13 +234,19 @@ def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
     )
 
 
-def _to_dataframe(sentences: list[str], similarity: np.ndarray) -> pd.DataFrame:
+def _to_dataframe(
+    sentences: list[str],
+    similarity: np.ndarray,
+    *,
+    filter_identity: bool = True,
+) -> pd.DataFrame:
     """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
     Args:
     ----
-        sentences (list[str]): list of sentences that were compared to each other using _einsum()
-        similarity (np.ndarray): output of _einsum()
+        sentences: list of sentences that were compared to each other using _einsum()
+        similarity: output of _einsum()
+        filter_identity: whether to remove rows where sentence is equal to other_sentence. Default: True.
 
     Returns:
     -------
@@ -250,9 +259,12 @@ def _to_dataframe(sentences: list[str], similarity: np.ndarray) -> pd.DataFrame:
         "level_1": "other_sentence",
         0: "similarity",
     }
-    return (
+    df = (
         pd.DataFrame(similarity, index=sentences, columns=sentences)  # type: ignore
         .stack()
         .reset_index()
         .rename(columns=new_names)
     )
+    if filter_identity:
+        df = df[~(df.sentence == df.other_sentence)]
+    return df  # type: ignore
