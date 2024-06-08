@@ -1,6 +1,4 @@
-"""
-Contains sentence similarity main function and algorithm.
-"""
+"""Contains sentence similarity main function and algorithm."""
 from functools import partial
 from typing import Protocol
 
@@ -15,14 +13,14 @@ from sentence_similarity.translator import (
 
 
 class Translator(Protocol):
-    """Protocol class for translator methods"""
+    """Protocol class for translator methods."""
 
     def encode(self, sentence: str) -> list[int]:
-        """Translates a string sentence into a list of integers"""
+        """Translate a string sentence into a list of integers."""
         ...
 
     def __len__(self) -> int:
-        """Returns the length of the vocabulary of the translator"""
+        """Return the length of the vocabulary of the translator."""
         ...
 
 
@@ -35,9 +33,10 @@ def sentence_similarity(
     translator: Translator | None = None,
     weight_matrix_min: float | str = 0.1,
 ) -> pd.DataFrame:
-    """
+    """Calculate similarity among provided sentences.
 
     Args:
+    ----
         sentences: list of sentences to be compared to each other
         tokenizer: function that performs tokenisation, allows passing in custom tokenizer.
                    Defaults to tokenize_words.
@@ -50,6 +49,7 @@ def sentence_similarity(
                            the correct position entirely.
 
     Returns:
+    -------
         A dataframe with columns (sentence, other_sentence, score) containing the paired
         sentences and the calculated similarity score.
         A score of 1 indicates the sentences are the same.
@@ -58,6 +58,7 @@ def sentence_similarity(
         A score larger than 1 indicates that some tokens are repeated in one or both sentences.
 
     Raises:
+    ------
         ValueError: if a string is passed into weight_matrix_min that is not 'identity'.
 
     """
@@ -92,7 +93,9 @@ def sentence_similarity(
     return _to_dataframe(sentences, similarity)
 
 
-def _numericalize(sentences: list[str], translator: Translator) -> list[np.ndarray]:
+def _numericalize(
+    sentences: list[str], translator: Translator
+) -> list[np.ndarray]:
     return [np.asarray(translator.encode(sentence)) for sentence in sentences]
 
 
@@ -101,11 +104,13 @@ def _one_hot_sentence(
     vocab_length: int,
     max_sentence_length: int,
 ) -> np.ndarray:
-    """Converts a numericalised sentence (e.g. [1, 2, 3]) into a matrix of one-hot encodings.
+    """Convert a numericalised sentence (e.g. [1, 2, 3]) into a matrix of one-hot encodings.
+
     Rows represent tokens in the vocabulary, columns represent the word order.
     Term frequency reduction is applied to handle cases where words are repeated in the sentence.
 
     Args:
+    ----
         sentence (np.ndarray): sentence numericalised through the vocabulary
         vocab_length (int): total number of tokens in the vocabulary
         max_sentence_length (int): length of the longest sentence in the comparison.
@@ -113,8 +118,10 @@ def _one_hot_sentence(
                                  padded with zeros when shorter.
 
     Returns:
+    -------
         np.ndarray: Matrix encoding of the sentence. Note that when term frequencies are applied,
                     the matrix can take any value between 0. and 1.
+
     """
     # starting with a matrix of zeros with a row for each word in the vocab,
     # and a column for each possible word in a sentence
@@ -126,31 +133,33 @@ def _one_hot_sentence(
     # This avoids getting high similarity scores because the same word appears mulitple
     # times in the sentence. Discounting with 1/sqrt(n), so my similarity score doesn't
     # disappear too much simply through repeated words
-    term_frequencies = one_hot.sum(
-        axis=1
-    )  # counting how often each word appears by summing over the columns
+
+    # counting how often each word appears by summing over the columns
+    term_frequencies = one_hot.sum(axis=1)
+
+    # avoiding divide by zero error with np.divide(where=...)
     inverse_term_frequencies = np.divide(
         1, np.sqrt(term_frequencies), where=term_frequencies > 0
-    )  # avoiding divide by zero error with np.divide(where=...)
+    )
     # multiply row by inverse term frequencies
     one_hot = np.einsum(
         "ij, i -> ij", one_hot, inverse_term_frequencies, optimize=EINSUM_OPT
     )
-    one_hot = np.nan_to_num(
-        one_hot
-    )  # making sure there are no nans in my array which seems to happen in testing
-
-    return one_hot
+    # making sure there are no nans in my array which seems to happen in testing
+    return np.nan_to_num(one_hot)
 
 
 def _weight_matrix(
-    size: int, minimum: float = 0.1, identity: bool = False
+    size: int, minimum: float = 0.1, *, identity: bool = False
 ) -> np.ndarray:
-    """Generates a weight matrix to discount cases where words do appear in a pair of sentences,
+    """Generate a weight matrix.
+
+    The weight matrix is used to discount cases where words do appear in a pair of sentences,
     but in different positions in the sentence. This matrix has 1.'s on the diagonal, and reduce
     out the the provided minimum value to the top-right and bottom-left corners of the matrix.
 
     Args:
+    ----
         size: Determines the shape of the square matrix (size, size)
         minimum: Determines the minimum value to enter into the weight matrix.
                  Should be between 0. and 1. Setting this to 1 disables weight scaling.
@@ -158,9 +167,11 @@ def _weight_matrix(
         identity: sets the weight matrix to an identity matrix of shape (size, size)
 
     Returns:
+    -------
         the weight matrix
 
     Raises:
+    ------
         ValueError: When [minimum] is not between 0. and 1.
 
 
@@ -177,26 +188,36 @@ def _weight_matrix(
     size_range = np.arange(size)
     linear_space = np.linspace(1, minimum, num=size)
 
-    weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))
+    weights = sum(
+        np.eye(size, k=n) * s for n, s in zip(size_range, linear_space)
+    )
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
 
-    assert weight_matrix.shape == (size, size), "weight matrix has incorrect shape"
+    assert weight_matrix.shape == (
+        size,
+        size,
+    ), "weight matrix has incorrect shape"
 
     return weight_matrix
 
 
 def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
-    """Calculates similarity among sentences by performing tensor inner product,
+    """Calculate similarity among sentences.
+
+    Similarity is calculated by performing tensor inner product,
     scaling by the weight matrix, and scaling the result over the diagonal.
     This is implemented using np.einsum to vastly optimise the calculation time
 
     Args:
+    ----
         tensor (np.ndarray): encoded sentences in tensor form,
                              of shape (sentences, vocabulary length, max sentence length)
         weight_matrix (np.ndarray): weight matrix of shape (sentences, sentences)
 
     Returns:
+    -------
         np.ndarray: similarity scores of shape (sentences, sentences)
+
     """
     # einsum to calculate the similarity scores for all sentences amongst each other
     similarity = np.einsum(
@@ -205,32 +226,33 @@ def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
 
     # scaling down columnwise by diagonal, this should result in
     # scoring in a column being relative to the sentence itself
-    similarity = np.einsum(
+    return np.einsum(
         "ij, j -> ij", similarity, 1 / np.diag(similarity), optimize=EINSUM_OPT
     )
 
-    return similarity
-
 
 def _to_dataframe(sentences: list[str], similarity: np.ndarray) -> pd.DataFrame:
-    """Constructs a pandas.DataFrame containing the combination of
-    each pair of sentences with their similarity scores.
+    """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
     Args:
+    ----
         sentences (list[str]): list of sentences that were compared to each other using _einsum()
         similarity (np.ndarray): output of _einsum()
 
     Returns:
+    -------
         pd.DataFrame: dataframe consisting of sentence pair columns named 'sentence'
                     and 'other_sentence' with their similarity score in 'similarity'
-    """
 
-    new_names = {"level_0": "sentence", "level_1": "other_sentence", 0: "similarity"}
-    df = (
-        pd.DataFrame(similarity, index=sentences, columns=sentences)
+    """
+    new_names = {
+        "level_0": "sentence",
+        "level_1": "other_sentence",
+        0: "similarity",
+    }
+    return (
+        pd.DataFrame(similarity, index=sentences, columns=sentences)  # type: ignore
         .stack()
         .reset_index()
         .rename(columns=new_names)
     )
-    return df
-
