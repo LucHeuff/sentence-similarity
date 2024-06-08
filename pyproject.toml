@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sentence-similarity"
-version = "1.0.0"
+version = "1.1.0"
 description = "Algorithm for fast comparison of string sentences"
 authors = ["Luc Heuff <lucheuff@hotmail.com>"]
 license = "MIT"
@@ -19,6 +19,7 @@ hypothesis = "^6.84.3"
 neovim = "^0.3.1"
 ruff = "^0.2.2"
 ipython = "^8.21.0"
+poetry2setup = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]
