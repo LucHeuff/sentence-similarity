@@ -12,6 +12,8 @@ python = "^3.11"
 numpy = "^1.25.2"
 pandas = "^2.1.0"
 strsimpy = "^0.2.1"
+sparse = "^0.15.4"
+polars = "^0.20.31"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
