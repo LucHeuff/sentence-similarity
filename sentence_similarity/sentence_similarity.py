@@ -1,4 +1,5 @@
 """Contains sentence similarity main function and algorithm."""
+from collections import Counter
 from functools import partial
 from typing import Protocol
 
@@ -126,30 +127,22 @@ def _one_hot_sentence(
                     the matrix can take any value between 0. and 1.
 
     """
-    # starting with a matrix of zeros with a row for each word in the vocab,
-    # and a column for each possible word in a sentence
+    # Determining the weight of words, in case they occur more than once.
+    # Weighting by 1/sqrt(n) such that the similarity score still adds up to 1
+    # even if words appear multiple times in the encoding products
+
+    counter = Counter(sentence)
+    values = [1 / np.sqrt(counter[word]) for word in sentence]
+
+    index = np.arange(len(sentence))
+
+    # building the one-hot matrix
     one_hot = np.zeros((vocab_length, max_sentence_length))
-    # replacing indices given from the numericalised sentences with ones
-    one_hot[(sentence, np.arange(len(sentence)))] = 1.0
 
-    # Term frequency is applied to discount words that appear in the sentence more often.
-    # This avoids getting high similarity scores because the same word appears mulitple
-    # times in the sentence. Discounting with 1/sqrt(n), so my similarity score doesn't
-    # disappear too much simply through repeated words
+    # replacing indices given from the numericalised sentences with the require value
+    one_hot[sentence, index] = values
 
-    # counting how often each word appears by summing over the columns
-    term_frequencies = one_hot.sum(axis=1)
-
-    # avoiding divide by zero error with np.divide(where=...)
-    inverse_term_frequencies = np.divide(
-        1, np.sqrt(term_frequencies), where=term_frequencies > 0
-    )
-    # multiply row by inverse term frequencies
-    one_hot = np.einsum(
-        "ij, i -> ij", one_hot, inverse_term_frequencies, optimize=EINSUM_OPT
-    )
-    # making sure there are no nans in my array which seems to happen in testing
-    return np.nan_to_num(one_hot)
+    return one_hot
 
 
 def _weight_matrix(
