@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sentence-similarity"
-version = "1.1.0"
+version = "1.2.0"
 description = "Algorithm for fast comparison of string sentences"
 authors = ["Luc Heuff <lucheuff@hotmail.com>"]
 license = "MIT"
@@ -12,7 +12,6 @@ python = "^3.11"
 numpy = "^1.25.2"
 pandas = "^2.1.0"
 strsimpy = "^0.2.1"
-sparse = "^0.15.4"
 polars = "^0.20.31"
 pyarrow = "^16.1.0"
 
