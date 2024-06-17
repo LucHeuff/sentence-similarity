@@ -4,6 +4,8 @@ import string
 
 import hypothesis.strategies as st
 import numpy as np
+import pandas as pd
+import polars as pl
 from hypothesis import assume, given
 from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import DrawFn, composite
@@ -234,7 +236,9 @@ from sentence_similarity.sentence_similarity import _to_dataframe  # noqa
 
 
 @composite
-def dataframe_strategy(draw: DrawFn) -> tuple[list[str], np.ndarray, bool]:
+def dataframe_strategy(
+    draw: DrawFn,
+) -> tuple[list[str], np.ndarray, bool, bool]:
     """Generate fake einsum output that can be converted to a dataframe.
 
     Allows testing whether the right values also end up in the right places
@@ -250,38 +254,57 @@ def dataframe_strategy(draw: DrawFn) -> tuple[list[str], np.ndarray, bool]:
         )
     )
     identity = draw(st.booleans())
-    return sents, data, identity
+    pandas = draw(st.booleans())
+    return sents, data, identity, pandas
 
 
 @given(dataframe_strategy())
-def test_to_dataframe(data: tuple[list[str], np.ndarray, bool]) -> None:
+def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
     """Test _to_dataframe().
 
     - Test whether the correct columns are present
     - Test whether all the sentences are present in both [sentence] and [other_sentence] columns
     - Test whether similarity scores end up in the correct place
+    - Test whether correctly returns pandas.DataFrame or polars.DataFrame
     """
-    sentences, similarity, identity = data
+    sentences, similarity, identity, pandas = data
 
-    df = _to_dataframe(sentences, similarity, filter_identity=identity)
-
-    assert np.array_equal(
-        df.columns, ["sentence", "other_sentence", "similarity"]
+    df = _to_dataframe(
+        sentences, similarity, filter_identity=identity, return_pandas=pandas
     )
-    assert set(sentences) == set(df.sentence.unique())
-    assert set(sentences) == set(df.other_sentence.unique())
+
+    assert set(df.columns) == {"sentence", "other_sentence", "similarity"}
+    assert set(sentences) == set(df["sentence"].unique())
+    assert set(sentences) == set(df["other_sentence"].unique())
+
+    if pandas:
+        assert isinstance(df, pd.DataFrame)
+    else:
+        assert isinstance(df, pl.DataFrame)
 
     # checking whether values have ended up in the right place
     indices = list(range(len(sentences)))
     for i, j in itertools.product(indices, indices):
         if i == j and identity:
             continue
-        sentence = sentences[i]  # noqa
-        other_sentence = sentences[j]  # noqa
-        row = df.query(
-            "sentence == @sentence & other_sentence == @other_sentence"
-        )
-        assert row.similarity.values == similarity[i, j]
+        sentence = sentences[i]
+        other_sentence = sentences[j]
+        if pandas:
+            assert (
+                df.loc[  # type: ignore
+                    (df.sentence == sentence)  # type: ignore
+                    & (df.other_sentence == other_sentence)  # type: ignore
+                ].similarity.item()
+                == similarity[i, j]
+            )
+        else:
+            assert (
+                df.filter(  # type: ignore
+                    (pl.col("sentence") == pl.lit(sentence))
+                    & (pl.col("other_sentence") == pl.lit(other_sentence))
+                )["similarity"].item()
+                == similarity[i, j]
+            )
 
 
 # ---- integration test of sentence_similarity ----
@@ -293,6 +316,7 @@ from sentence_similarity.sentence_similarity import sentence_similarity  # noqa
     tokenizer=st.sampled_from(tokenizers),
     weight_matrix_min=st.floats(min_value=0, max_value=0.999),
     filter_identity=st.booleans(),
+    return_pandas=st.booleans(),
 )
 def test_sentence_similarity(
     sentences: list[str],
@@ -300,21 +324,29 @@ def test_sentence_similarity(
     weight_matrix_min: float,
     *,
     filter_identity: bool,
+    return_pandas: bool,
 ) -> None:
     """Test sentence_similarity.
 
     Integration test of sentence similarity:
     # - Test whether each sentence is in both [sentence] and [other_sentence] columns
     # - Test whether the provided sentences all show up in the [sentence] column
+    # - Test whether the output is of the correct type (pd.DataFrame or pl.DataFrame)
     """
     similarity = sentence_similarity(
         sentences,
         tokenizer,
         weight_matrix_min=weight_matrix_min,
         filter_identity=filter_identity,
+        return_pandas=return_pandas,
     )
 
-    assert set(similarity.sentence.unique()) == set(
-        similarity.other_sentence.unique()
+    if return_pandas:
+        assert isinstance(similarity, pd.DataFrame)
+    else:
+        assert isinstance(similarity, pl.DataFrame)
+
+    assert set(similarity["sentence"].unique()) == set(
+        similarity["other_sentence"].unique()
     )
-    assert set(similarity.sentence.unique()) == set(sentences)
+    assert set(similarity["sentence"].unique()) == set(sentences)

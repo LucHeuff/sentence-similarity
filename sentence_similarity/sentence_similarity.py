@@ -26,6 +26,12 @@ class Translator(Protocol):
         ...
 
 
+class DuplicateSentencesError(Exception):
+    """Raised when some of the sentences passed into sentence_similarity() are duplicated."""
+
+    pass
+
+
 EINSUM_OPT = "optimal"
 
 
@@ -36,7 +42,8 @@ def sentence_similarity(
     weight_matrix_min: float | str = 0.1,
     *,
     filter_identity: bool = True,
-) -> pd.DataFrame:
+    return_pandas: bool = True,
+) -> pd.DataFrame | pl.DataFrame:
     """Calculate similarity among provided sentences.
 
     Args:
@@ -52,6 +59,7 @@ def sentence_similarity(
                            Set to 'identity' if you want to ignore words that are not in
                            the correct position entirely.
         filter_identity: whether cases where the sentence is compared to itself should be filtered out.
+        return_pandas: whether to return a pandas.DataFrame. Otherwise returns a polars.DataFrame.
 
     Returns:
     -------
@@ -67,6 +75,10 @@ def sentence_similarity(
         ValueError: if a string is passed into weight_matrix_min that is not 'identity'.
 
     """
+    if len(sentences) != len(set(sentences)):
+        message = "[sentences] is not unique, some sentences are duplicated."
+        raise DuplicateSentencesError(message)
+
     # Creating vocabulary to translate sentences into numbers
     if translator is None:
         translator = create_default_translator(sentences, tokenizer)
@@ -96,7 +108,12 @@ def sentence_similarity(
 
     similarity = _einsum(one_hot_tensor, weight_matrix)
 
-    return _to_dataframe(sentences, similarity, filter_identity=filter_identity)
+    return _to_dataframe(
+        sentences,
+        similarity,
+        filter_identity=filter_identity,
+        return_pandas=return_pandas,
+    )
 
 
 def _numericalize(
@@ -244,7 +261,8 @@ def _to_dataframe(
     similarity: np.ndarray,
     *,
     filter_identity: bool = True,
-) -> pl.DataFrame:
+    return_pandas: bool = False,
+) -> pl.DataFrame | pd.DataFrame:
     """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
     Args:
@@ -252,6 +270,7 @@ def _to_dataframe(
         sentences: list of sentences that were compared to each other using _einsum()
         similarity: output of _einsum()
         filter_identity: whether to remove rows where sentence is equal to other_sentence. Default: True.
+        return_pandas: whether to return a pandas Dataframe. Defaults to returning a polars dataframe.
 
     Returns:
     -------
@@ -272,20 +291,9 @@ def _to_dataframe(
     )
 
     if filter_identity:
-        return df.filter(pl.col("sentence") != pl.col("other_sentence"))
-    return df
+        df = df.filter(pl.col("sentence") != pl.col("other_sentence"))
 
-    new_names = {
-        "level_0": "sentence",
-        "level_1": "other_sentence",
-        0: "similarity",
-    }
-    df = (
-        pd.DataFrame(similarity, index=sentences, columns=sentences)  # type: ignore
-        .stack()
-        .reset_index()
-        .rename(columns=new_names)
-    )
-    if filter_identity:
-        df = df[~(df.sentence == df.other_sentence)]
-    return df  # type: ignore
+    if return_pandas:
+        df = df.to_pandas()
+
+    return df
