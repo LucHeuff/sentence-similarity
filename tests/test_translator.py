@@ -8,7 +8,7 @@ from hypothesis import assume, given
 from hypothesis.strategies import DrawFn, composite
 from pytest import raises
 
-PUNCTUATION = string.punctuation.replace("[\\]", "")
+PUNCTUATION = r"%&'*+,-./:;=?@^`|~"
 ALPHABET = string.ascii_letters + string.digits
 WHITESPACE = string.whitespace
 
