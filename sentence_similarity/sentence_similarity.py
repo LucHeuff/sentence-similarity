@@ -92,6 +92,7 @@ def sentence_similarity(
     one_hot_sentences = [one_hot_encode(sentence) for sentence in num_sentences]
 
     one_hot_tensor = np.stack(one_hot_sentences)
+
     similarity = _einsum(one_hot_tensor, weight_matrix)
 
     return _to_dataframe(sentences, similarity, filter_identity=filter_identity)
@@ -197,7 +198,10 @@ def _weight_matrix(
     return weight_matrix
 
 
-def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
+def _einsum(
+    tensor: np.ndarray,
+    weight_matrix: np.ndarray,
+) -> np.ndarray:
     """Calculate similarity among sentences.
 
     Similarity is calculated by performing tensor inner product,
@@ -206,9 +210,9 @@ def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
 
     Args:
     ----
-        tensor (np.ndarray): encoded sentences in tensor form,
+        tensor: encoded sentences in tensor form,
                              of shape (sentences, vocabulary length, max sentence length)
-        weight_matrix (np.ndarray): weight matrix of shape (sentences, sentences)
+        weight_matrix: weight matrix of shape (sentences, sentences)
 
     Returns:
     -------
@@ -217,11 +221,18 @@ def _einsum(tensor: np.ndarray, weight_matrix: np.ndarray) -> np.ndarray:
     """
     # einsum to calculate the similarity scores for all sentences amongst each other
     similarity = np.einsum(
-        "mij, nik, jk -> mn", tensor, tensor, weight_matrix, optimize=EINSUM_OPT
+        "mij, nik, jk -> mn",
+        tensor,
+        tensor,
+        weight_matrix,
+        optimize=EINSUM_OPT,
     )
 
     # scaling down columnwise by diagonal, this should result in
     # scoring in a column being relative to the sentence itself
+    # This is needed because the weight matrix will also discount tokens that
+    # are repeated in the same sentence. This step should bump these cases back
+    # up to 1.
     return np.einsum(
         "ij, j -> ij", similarity, 1 / np.diag(similarity), optimize=EINSUM_OPT
     )
