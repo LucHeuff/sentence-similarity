@@ -11,7 +11,7 @@ warnings.simplefilter("ignore", DeprecationWarning)
 
 import pandas as pd
 
-bench = pd.read_csv("bench.csv")
+bench = pd.read_csv("bench.csv").drop_duplicates()
 
 # Benchmarking
 
