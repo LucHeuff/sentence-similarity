@@ -16,6 +16,7 @@ def tokenize_words(sentence: str) -> list[str]:
 
     Will tokenize punctuation as a separate token, even if they are
     directly connected to a word.
+    NOTE: brackets and _ are not considered punctuation.
 
     Args:
     ----
@@ -26,7 +27,8 @@ def tokenize_words(sentence: str) -> list[str]:
         list of string tokens
 
     """
-    sentence = re.sub(r"([^a-zA-Z\d\s])", "  \\1", sentence)
+    punctuation = r"%&'*+,-./:;=?@\^`|~"
+    sentence = re.sub(f"([{punctuation}])", "  \\1", sentence)
     return sentence.split()
 
 
