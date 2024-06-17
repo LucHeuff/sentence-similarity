@@ -5,6 +5,7 @@ from typing import Protocol
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from sentence_similarity.translator import (
     TokenizeFunction,
@@ -243,7 +244,7 @@ def _to_dataframe(
     similarity: np.ndarray,
     *,
     filter_identity: bool = True,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
     Args:
@@ -258,6 +259,22 @@ def _to_dataframe(
                     and 'other_sentence' with their similarity score in 'similarity'
 
     """
+    # polars variant
+
+    df = (
+        pl.from_numpy(similarity, schema=sentences)
+        .with_columns(sentence=pl.Series(sentences))
+        .melt(
+            id_vars="sentence",
+            variable_name="other_sentence",
+            value_name="similarity",
+        )
+    )
+
+    if filter_identity:
+        return df.filter(pl.col("sentence") != pl.col("other_sentence"))
+    return df
+
     new_names = {
         "level_0": "sentence",
         "level_1": "other_sentence",
