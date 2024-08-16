@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sentence-similarity"
-version = "1.2.0"
+version = "1.2.1"
 description = "Algorithm for fast comparison of string sentences"
 authors = ["Luc Heuff <lucheuff@hotmail.com>"]
 license = "MIT"
@@ -10,7 +10,6 @@ packages = [{include = "sentence_similarity"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 numpy = "^1.25.2"
-pandas = "^2.1.0"
 strsimpy = "^0.2.1"
 polars = "^0.20.31"
 pyarrow = "^16.1.0"
@@ -22,7 +21,27 @@ neovim = "^0.3.1"
 ruff = "^0.2.2"
 ipython = "^8.21.0"
 poetry2setup = "^1.1.0"
+pandas = "^2.2.2"
+
+[tool.ruff]
+line-length = 80
+output-format = 'concise'
+
+[tool.ruff.lint]
+select = [
+    "F", "C90", "I", "N", "D", "ANN", "BLE", "FBT", "B", "A", "C4", "EM",
+    "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "RSE", "RET", "SLF",
+    "SIM", "ARG", "FIX", "ERA", "PD", "PL", "TRY", "PERF", "RUF"
+]
+ignore = ["ANN101", "PLR09", "D100", "D201", "D203", "D213", "F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+
