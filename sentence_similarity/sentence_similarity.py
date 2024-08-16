@@ -4,7 +4,6 @@ from functools import partial
 from typing import Protocol
 
 import numpy as np
-import pandas as pd
 import polars as pl
 
 from sentence_similarity.translator import (
@@ -29,8 +28,6 @@ class Translator(Protocol):
 class DuplicateSentencesError(Exception):
     """Raised when some of the sentences passed into sentence_similarity() are duplicated."""
 
-    pass
-
 
 EINSUM_OPT = "optimal"
 
@@ -43,7 +40,7 @@ def sentence_similarity(
     *,
     filter_identity: bool = True,
     return_pandas: bool = True,
-) -> pd.DataFrame | pl.DataFrame:
+) -> pl.DataFrame:
     """Calculate similarity among provided sentences.
 
     Args:
@@ -262,7 +259,7 @@ def _to_dataframe(
     *,
     filter_identity: bool = True,
     return_pandas: bool = False,
-) -> pl.DataFrame | pd.DataFrame:
+) -> pl.DataFrame:
     """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
     Args:
@@ -296,4 +293,4 @@ def _to_dataframe(
     if return_pandas:
         df = df.to_pandas()
 
-    return df
+    return df  # type: ignore
