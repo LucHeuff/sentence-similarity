@@ -1,4 +1,5 @@
 """Contains tests for sentence_similarity.py."""
+
 import itertools
 import string
 
@@ -50,7 +51,10 @@ def sentence_generator(draw: DrawFn) -> str:
 
 
 # ---- Testing numericalization ----
-from sentence_similarity.sentence_similarity import _numericalize
+from sentence_similarity.sentence_similarity import (
+    InvalidWeightMatrixError,
+    _numericalize,
+)
 
 
 @composite
@@ -157,7 +161,7 @@ def test_weight_matrix_exception(size: int, min_value: float) -> None:
 
     - Test if the weight matrix throws an exception if the min value is outside the range [0, 1]
     """
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidWeightMatrixError):
         _weight_matrix(size, min_value)
 
 
@@ -274,18 +278,18 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
     """
     sentences, similarity, identity, pandas = data
 
-    df = _to_dataframe(
+    sdf = _to_dataframe(
         sentences, similarity, filter_identity=identity, return_pandas=pandas
     )
 
-    assert set(df.columns) == {"sentence", "other_sentence", "similarity"}
-    assert set(sentences) == set(df["sentence"].unique())
-    assert set(sentences) == set(df["other_sentence"].unique())
+    assert set(sdf.columns) == {"sentence", "other_sentence", "similarity"}
+    assert set(sentences) == set(sdf["sentence"].unique())
+    assert set(sentences) == set(sdf["other_sentence"].unique())
 
     if pandas:
-        assert isinstance(df, pd.DataFrame)
+        assert isinstance(sdf, pd.DataFrame)
     else:
-        assert isinstance(df, pl.DataFrame)
+        assert isinstance(sdf, pl.DataFrame)
 
     # checking whether values have ended up in the right place
     indices = list(range(len(sentences)))
@@ -296,15 +300,15 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
         other_sentence = sentences[j]
         if pandas:
             assert (
-                df.loc[  # type: ignore
-                    (df.sentence == sentence)  # type: ignore
-                    & (df.other_sentence == other_sentence)  # type: ignore
+                sdf.loc[  # type: ignore
+                    (sdf.sentence == sentence)  # type: ignore
+                    & (sdf.other_sentence == other_sentence)  # type: ignore
                 ].similarity.item()
                 == similarity[i, j]
             )
         else:
             assert (
-                df.filter(  # type: ignore
+                sdf.filter(  # type: ignore
                     (pl.col("sentence") == pl.lit(sentence))
                     & (pl.col("other_sentence") == pl.lit(other_sentence))
                 )["similarity"].item()
@@ -316,7 +320,6 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
 from sentence_similarity.sentence_similarity import sentence_similarity
 
 
-# TODO manually generate sentences cause something weird is going wrong here
 @given(
     tokenizer=st.sampled_from(TOKENIZERS),
     weight_matrix_min=st.floats(min_value=0, max_value=0.999),

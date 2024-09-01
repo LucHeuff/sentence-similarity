@@ -1,4 +1,5 @@
 """Contains sentence similarity main function and algorithm."""
+
 from collections import Counter
 from functools import partial
 from typing import Protocol
@@ -27,6 +28,10 @@ class Translator(Protocol):
 
 class DuplicateSentencesError(Exception):
     """Raised when some of the sentences passed into sentence_similarity() are duplicated."""
+
+
+class InvalidWeightMatrixError(Exception):
+    """Raised when input to generate a weight matrix is invalid."""
 
 
 EINSUM_OPT = "optimal"
@@ -88,9 +93,8 @@ def sentence_similarity(
     if weight_matrix_min == "identity":
         weight_matrix = _weight_matrix(max_sentence_length, identity=True)
     elif isinstance(weight_matrix_min, str):
-        raise ValueError(
-            f"weight_matrix_min should be float or 'identity', got {weight_matrix_min}"
-        )
+        message = f"weight_matrix_min should be float or 'identity', got {weight_matrix_min}"
+        raise InvalidWeightMatrixError(message)
     else:
         weight_matrix = _weight_matrix(max_sentence_length, weight_matrix_min)
 
@@ -191,11 +195,8 @@ def _weight_matrix(
     if identity:
         return np.eye(size)
     if not 0 <= minimum <= 1:
-        raise ValueError(
-            f"""You are trying to set a minimum value for the weight matrix of {minimum},
-            which is outside the range [0., 1.].
-            The weight matrix was not designed with this in mind"""
-        )
+        message = f"""You are trying to set a minimum value for the weight matrix of {minimum}, which is outside the range [0., 1.]."""
+        raise InvalidWeightMatrixError(message)
 
     size_range = np.arange(size)
     linear_space = np.linspace(1, minimum, num=size)
@@ -277,7 +278,7 @@ def _to_dataframe(
     """
     # polars variant
 
-    df = (
+    sdf = (
         pl.from_numpy(similarity, schema=sentences)
         .with_columns(sentence=pl.Series(sentences))
         .melt(
@@ -288,9 +289,9 @@ def _to_dataframe(
     )
 
     if filter_identity:
-        df = df.filter(pl.col("sentence") != pl.col("other_sentence"))
+        sdf = sdf.filter(pl.col("sentence") != pl.col("other_sentence"))
 
     if return_pandas:
-        df = df.to_pandas()
+        sdf = sdf.to_pandas()
 
-    return df  # type: ignore
+    return sdf  # type: ignore
