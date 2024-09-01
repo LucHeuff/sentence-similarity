@@ -11,6 +11,7 @@ import pytest
 from hypothesis import assume, given
 from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import DrawFn, composite
+from polars.testing import assert_frame_equal
 
 from sentence_similarity.translator import (
     TokenizeFunction,
@@ -119,7 +120,9 @@ def test_one_hot_sentence(num_sentence: np.ndarray) -> None:
     )  # making sure that if the sentence is [0] this is interpreted as a length of 1
     max_sentence_length = num_sentence.size
 
-    encoded = _one_hot_sentence(num_sentence, vocab_length, max_sentence_length)
+    encoded, _ = _one_hot_sentence(
+        num_sentence, vocab_length, max_sentence_length
+    )
 
     assert encoded.shape == (vocab_length, max_sentence_length)
     assert np.array_equal(num_sentence, encoded.argmax(axis=0))
@@ -225,14 +228,15 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]) -> None:
     """
     sentences, vocab_length, sentence_length = data
 
-    one_hot_sentences = [
+    one_hot_encodings = [
         _one_hot_sentence(sentence, vocab_length, sentence_length)
         for sentence in sentences
     ]
+    one_hot_sentences, max_scores = list(zip(*one_hot_encodings))
     tensor = np.stack(one_hot_sentences)
     weight_matrix = _weight_matrix(size=sentence_length, minimum=0.2)
 
-    einsum = _einsum(tensor, weight_matrix)
+    einsum = _einsum(tensor, weight_matrix, np.asarray(max_scores))
 
     n = len(sentences)
     assert einsum.shape == (n, n)
@@ -362,3 +366,19 @@ def test_sentence_similarity(
         similarity["other_sentence"].unique()
     )
     assert set(similarity["sentence"].unique()) == set(sentences)
+
+
+def test_sentence_similarity_outcomes() -> None:
+    """Test whether the values that come out of sentence similarity make sense."""
+    sentences = ["bijna hetzelfde 1", "bijna hetzelfde 2"]
+    out_df = pl.DataFrame(
+        {
+            "sentence": sentences,
+            "other_sentence": sentences[::-1],
+            "similarity": [2 / 3, 2 / 3],
+        }
+    )
+    ss = sentence_similarity(sentences)
+    assert_frame_equal(
+        ss, out_df, check_row_order=False, check_column_order=False
+    )

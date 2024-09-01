@@ -17,7 +17,7 @@ from sentence_similarity.translator import (
 class Translator(Protocol):
     """Protocol class for translator methods."""
 
-    def encode(self, sentence: str) -> list[int]:
+    def encode(self, sentence: str) -> list[int | None]:
         """Translate a string sentence into a list of integers."""
         ...
 
@@ -44,7 +44,7 @@ def sentence_similarity(
     weight_matrix_min: float | str = 0.1,
     *,
     filter_identity: bool = True,
-    return_pandas: bool = True,
+    return_pandas: bool = False,
 ) -> pl.DataFrame:
     """Calculate similarity among provided sentences.
 
@@ -61,7 +61,7 @@ def sentence_similarity(
                            Set to 'identity' if you want to ignore words that are not in
                            the correct position entirely.
         filter_identity: whether cases where the sentence is compared to itself should be filtered out.
-        return_pandas: whether to return a pandas.DataFrame. Otherwise returns a polars.DataFrame.
+        return_pandas: whether to return a pandas.DataFrame. Defaults to returning a polars.DataFrame.
 
     Returns:
     -------
@@ -84,6 +84,7 @@ def sentence_similarity(
     # Creating vocabulary to translate sentences into numbers
     if translator is None:
         translator = create_default_translator(sentences, tokenizer)
+
     vocab_length = len(translator)
 
     num_sentences = _numericalize(sentences, translator)
@@ -103,11 +104,12 @@ def sentence_similarity(
         vocab_length=vocab_length,
         max_sentence_length=max_sentence_length,
     )
-    one_hot_sentences = [one_hot_encode(sentence) for sentence in num_sentences]
+    one_hot_encodings = [one_hot_encode(sentence) for sentence in num_sentences]
+    one_hot_sentences, max_scores = list(zip(*one_hot_encodings))
 
     one_hot_tensor = np.stack(one_hot_sentences)
 
-    similarity = _einsum(one_hot_tensor, weight_matrix)
+    similarity = _einsum(one_hot_tensor, weight_matrix, np.asarray(max_scores))
 
     return _to_dataframe(
         sentences,
@@ -127,7 +129,7 @@ def _one_hot_sentence(
     sentence: np.ndarray,
     vocab_length: int,
     max_sentence_length: int,
-) -> np.ndarray:
+) -> tuple[np.ndarray, float]:
     """Convert a numericalised sentence (e.g. [1, 2, 3]) into a matrix of one-hot encodings.
 
     Rows represent tokens in the vocabulary, columns represent the word order.
@@ -135,9 +137,9 @@ def _one_hot_sentence(
 
     Args:
     ----
-        sentence (np.ndarray): sentence numericalised through the vocabulary
-        vocab_length (int): total number of tokens in the vocabulary
-        max_sentence_length (int): length of the longest sentence in the comparison.
+        sentence: sentence numericalised through the vocabulary
+        vocab_length: total number of tokens in the vocabulary
+        max_sentence_length: length of the longest sentence in the comparison.
                                  This makes sure all matrices are of the same size,
                                  padded with zeros when shorter.
 
@@ -150,19 +152,28 @@ def _one_hot_sentence(
     # Determining the weight of words, in case they occur more than once.
     # Weighting by 1/sqrt(n) such that the similarity score still adds up to 1
     # even if words appear multiple times in the encoding products
+    # Setting to 0 if the word is None, using 1 / inf = 0
 
     counter = Counter(sentence)
+    counter[None] = np.inf  # pyright: ignore
+
     values = [1 / np.sqrt(counter[word]) for word in sentence]
+    # calculating max possible score. This is the square of values plus 1 for every None
+    max_score = np.power(values, 2).sum() + (sentence == None).sum()
+
+    # replacing None occurrences with 1, these will be set to 0 anyway
+    sentence[sentence == None] = 1
+    sentence = sentence.astype(int)
 
     index = np.arange(len(sentence))
 
     # building the one-hot matrix
     one_hot = np.zeros((vocab_length, max_sentence_length))
 
-    # replacing indices given from the numericalised sentences with the require value
+    # replacing indices given from the numericalised sentences with the required value
     one_hot[sentence, index] = values
 
-    return one_hot
+    return one_hot, max_score
 
 
 def _weight_matrix(
@@ -215,8 +226,7 @@ def _weight_matrix(
 
 
 def _einsum(
-    tensor: np.ndarray,
-    weight_matrix: np.ndarray,
+    tensor: np.ndarray, weight_matrix: np.ndarray, max_scores: np.ndarray
 ) -> np.ndarray:
     """Calculate similarity among sentences.
 
@@ -229,6 +239,7 @@ def _einsum(
         tensor: encoded sentences in tensor form,
                              of shape (sentences, vocabulary length, max sentence length)
         weight_matrix: weight matrix of shape (sentences, sentences)
+        max_scores: vector of maximum possible scores for each sentence
 
     Returns:
     -------
@@ -236,21 +247,13 @@ def _einsum(
 
     """
     # einsum to calculate the similarity scores for all sentences amongst each other
-    similarity = np.einsum(
-        "mij, nik, jk -> mn",
+    return np.einsum(
+        "mij, nik, jk, n -> mn",
         tensor,
         tensor,
         weight_matrix,
+        1 / max_scores,
         optimize=EINSUM_OPT,
-    )
-
-    # scaling down columnwise by diagonal, this should result in
-    # scoring in a column being relative to the sentence itself
-    # This is needed because the weight matrix will also discount tokens that
-    # are repeated in the same sentence. This step should bump these cases back
-    # up to 1.
-    return np.einsum(
-        "ij, j -> ij", similarity, 1 / np.diag(similarity), optimize=EINSUM_OPT
     )
 
 

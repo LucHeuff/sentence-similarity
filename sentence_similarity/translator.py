@@ -90,9 +90,9 @@ class Vocab:
         ), "Integer values are not consecutive."
         self.vocab = vocab
 
-    def __getitem__(self, token: str) -> int:
+    def __getitem__(self, token: str) -> int | None:
         """Get the value for this token."""
-        return self.vocab[token]
+        return self.vocab.get(token, None)
 
     def __iter__(self) -> Iterator[int]:
         """Get an iterator over vocab values."""
@@ -123,13 +123,9 @@ class Translator:
         self.tokenize = tokenizer
         self.vocab = vocab
 
-    def encode(self, sentence: str) -> list[int]:
+    def encode(self, sentence: str) -> list[int | None]:
         """Encode each word in the sentence if it appears in the vocab, resulting in list of integers."""
-        return [
-            self.vocab[token]
-            for token in self.tokenize(sentence)
-            if token in self.vocab
-        ]
+        return [self.vocab[token] for token in self.tokenize(sentence)]
 
     def __len__(self) -> int:
         """Return the length of the Translator."""
