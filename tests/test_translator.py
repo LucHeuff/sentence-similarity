@@ -1,12 +1,14 @@
 """Contains tests for translator.py."""
 import string
+from dataclasses import dataclass
 from itertools import chain
 from typing import Callable
 
 import hypothesis.strategies as st
-from hypothesis import assume, given
+import pytest
+from hypothesis import given
 from hypothesis.strategies import DrawFn, composite
-from pytest import raises
+from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 PUNCTUATION = r"%&'*+,-./:;=?@^`|~"
 ALPHABET = string.ascii_letters + string.digits
@@ -42,7 +44,15 @@ def punctuation_generator(draw: DrawFn) -> str:
 
 
 # ---- Testing tokenizer functions ----
-from sentence_similarity.translator import (  # noqa
+from sentence_similarity.translator import (
+    StringDistanceVocabError,
+    TokenizeFunction,
+    Translator,
+    Vocab,
+    VocabUniqueTokensError,
+    create_default_vocab,
+    create_string_distance_vocab,
+    create_synonym_vocab,
     tokenize_characters,
     tokenize_on_spaces,
     tokenize_words,
@@ -55,7 +65,7 @@ def tokenize_on_spaces_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
     Allows testing whether tokenization correctly recovers the words that went into the sentence.
     """
-    words = draw(st.lists(word_generator(), min_size=1))
+    words = draw(st.lists(word_generator(), min_size=1, unique=True))
     sentence = " ".join(words)
     return words, sentence
 
@@ -73,7 +83,7 @@ def tokenize_character_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
     Allows testing whether tokenization correctly recovers the characters that went into the sentence.
     """
-    characters = draw(st.lists(character_generator(), min_size=1))
+    characters = draw(st.lists(character_generator(), min_size=1, unique=True))
     sentence = "".join(characters)
     return characters, sentence
 
@@ -92,11 +102,14 @@ def tokenize_words_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
     Allows testing whether tokenize_words correctly splits off punctuation
     """
-    words = draw(st.lists(word_generator(), min_size=1))
+    words = draw(st.lists(word_generator(), min_size=1, unique=True))
     # putting punctuation after each word, easiest test
     punctuation = draw(
         st.lists(
-            punctuation_generator(), min_size=len(words), max_size=len(words)
+            punctuation_generator(),
+            min_size=len(words),
+            max_size=len(words),
+            unique=True,
         )
     )
     # making the list of tokens as I expect them to be returned
@@ -116,393 +129,199 @@ def test_tokenize_words(data: tuple[list[str], str]) -> None:
     assert tokenize_words(sentence) == tokens
 
 
-# ---- Testing Translator ----
-from sentence_similarity.translator import TokenizeFunction, Translator  # noqa
+# ---- Testing Vocab
 
-JoinFunc = Callable[[list[str]], str]
 
-tokenizer_factory = {
-    # method format: (tokenizer, sampler, join_function)
-    "on_spaces": (tokenize_on_spaces, word_generator, " ".join),
-    "characters": (tokenize_characters, character_generator, "".join),
+@dataclass
+class VocabComponents:
+    """Contains components for testing Vocab."""
+
+    vocab: dict[str, int]
+    vocab_length: int
+    fail_tokens: bool
+    fail_min: bool
+    fail_consecutive: bool
+
+
+@composite
+def vocab_strategy(draw: DrawFn) -> VocabComponents:
+    """Generate a vocab and failure cases for Vocab generation.
+
+    Args:
+    ----
+        draw: hypothesis draw function
+
+    Returns:
+    -------
+        VocabComponents for test
+
+    """
+    fail_min = draw(st.booleans())
+    fail_consecutive = draw(st.booleans())
+    fail_tokens = draw(st.booleans())
+    size = draw(st.integers(min_value=1 + fail_consecutive, max_value=5)) * (
+        not fail_tokens
+    )
+    words = draw(
+        st.lists(word_generator(), min_size=size, max_size=size, unique=True)
+    )
+    vocab = {
+        token: (i - (1 * fail_min)) * (1 + fail_consecutive)
+        for (i, token) in enumerate(words)
+    }
+    return VocabComponents(vocab, size, fail_tokens, fail_min, fail_consecutive)
+
+
+@given(comp=vocab_strategy())
+def test_vocab(comp: VocabComponents) -> None:
+    """Test whether Vocab creation works as intended."""
+    if comp.fail_min or comp.fail_consecutive or comp.fail_tokens:
+        with pytest.raises(AssertionError):
+            vocab = Vocab(comp.vocab)
+    else:
+        vocab = Vocab(comp.vocab)
+        assert len(vocab) == comp.vocab_length
+        for token in comp.vocab:
+            assert token in vocab
+            assert vocab[token] == comp.vocab[token]
+        # checking if __contains__ works as intended.
+        # concatenating all tokens and adding a character since that should
+        # never randomly appear in the vocab.
+        assert not "".join(comp.vocab.keys()) + "a" in vocab
+
+
+TOKENIZERS = [tokenize_words, tokenize_characters, tokenize_on_spaces]
+
+TOKENIZER_STRATEGY = {
+    tokenize_words: tokenize_words_strategy,
+    tokenize_on_spaces: tokenize_on_spaces_strategy,
+    tokenize_characters: tokenize_character_strategy,
 }
 
 
-@composite
-def tokenizer_method_generator(
-    draw: DrawFn,
-) -> tuple[TokenizeFunction, Sampler, JoinFunc]:
-    """Create a tokenizer method.
-
-    Since the behaviour of tokens differs between tokenizers,
-    defining a separate strategy to keep the required functions and strategies together.
-    """
-    tokenize_method = draw(st.sampled_from(list(tokenizer_factory.keys())))
-    return tokenizer_factory[tokenize_method]
-    # NOTE should raise an error when a new tokenizer is added but
-    # not included in the tokenizer_factory :)
-
-
-@composite
-def vocab_generator(draw: DrawFn, sampler: Sampler) -> dict[str, int]:
-    """Generate a vocab from tokens sampled with the sampler."""
-    keys = draw(
-        st.lists(sampler(), min_size=5, max_size=10, unique=True)
-    )  # drawing random tokens
-    values = list(range(len(keys)))
-    randomizer = draw(st.randoms())
-    randomizer.shuffle(
-        values
-    )  # shuffling values to make sure the order doesn't influence the Translator
-    return dict(zip(keys, values))
-
-
-@composite
-def translator_strategy(
-    draw: DrawFn,
-) -> tuple[TokenizeFunction, dict[str, int], list[int], str]:
-    """Generate a tokenizer, vocab, encodings and sentence to test whether the translator behaves properly.
-
-    - Generating a vocab with tokens beloning to a tokenizing strategy
-    - Generating a random encoding
-    - Generating a sentence from that encoding through reversing the vocab.
-      This allows testing whether the translator encodes properly.
-    """
-    tokenizer, sampler, join_function = draw(tokenizer_method_generator())
-    vocab = draw(vocab_generator(sampler))  # generating vocabulary
-    _reverse_vocab = {
-        value: key for (key, value) in vocab.items()
-    }  # reversing so a sentence can be generated from encodings
-    # create an encoded sentence and constructing an accompanying sentence through the vocab
-    encodings = draw(
-        st.lists(st.sampled_from(sorted(vocab.values())), min_size=1)
-    )
-    sentence = join_function(_reverse_vocab[num] for num in encodings)  # type: ignore
-    return tokenizer, vocab, encodings, sentence
-
-
-@given(data=translator_strategy())
-def test_translator(
-    data: tuple[TokenizeFunction, dict[str, int], list[int], str],
-) -> None:
-    """Testing Translator.
-
-    - Testing whether sentences are correctly encoded
-    - Testing whether the __len__ on the translator correctly returns the length of the vocab
-    - Testing whether the __len__ on the translator is an int
-    """
-    tokenizer, vocab, encodings, sentence = data
-    translator = Translator(tokenizer, vocab)
-
-    assert translator.encode(sentence) == encodings
-    assert len(translator) == len(vocab)
-    assert isinstance(len(translator), int)
-
-
-@given(
-    tokenizer=st.sampled_from([tokenize_on_spaces, tokenize_characters]),
-    negative_vocab=st.dictionaries(
-        keys=word_generator(), values=st.integers(max_value=-1), min_size=5
-    ),
-)
-def test_translator_negative_vocab_assertion(
-    tokenizer: TokenizeFunction, negative_vocab: dict
-) -> None:
-    """Test whether Translator correctly fails assertion when negative values are supplied in the vocab."""
-    with raises(AssertionError):
-        Translator(tokenizer, negative_vocab)
-
-
-@composite
-def too_large_values_vocab_generator(draw: DrawFn) -> None:
-    """Generate vocab that has larger values in it than it is long."""
-    _vocab_length = draw(st.integers(min_value=1, max_value=10))
-    return draw(
-        st.dictionaries(  # type:ignore
-            keys=word_generator(),
-            values=st.integers(min_value=_vocab_length + 1),
-            min_size=_vocab_length,
-            max_size=_vocab_length,
-        )
-    )
-
-
-@given(
-    tokenizer=st.sampled_from([tokenize_on_spaces, tokenize_characters]),
-    too_large_vocab=too_large_values_vocab_generator(),
-)
-def test_translator_too_large_value_vocab_assertion(
-    tokenizer: TokenizeFunction, too_large_vocab: dict
-) -> None:
-    """Test whether Translator correctly fails assertion when vocab contains values that are larger than its length."""
-    with raises(AssertionError):
-        Translator(tokenizer, too_large_vocab)
-
-
-# ---- Testing vocab and default translator creators ----
-from sentence_similarity.translator import (  # noqa
-    create_default_translator,
-    create_vocab,
-)
-
-
-@composite
-def corpus_and_sentences_generator(
-    draw: DrawFn, sampler: Callable, join_function: JoinFunc
-) -> tuple[set[str], list[str]]:
-    """Generate a corpus containing tokens that are used in the sentences."""
-    # It is very hard to guarantee a set of sentences that use every word in the vocab.
-    # So I reverse the approach, generate sentences and retrieve the corpus from those sentences.
-    candidate_corpus = draw(st.lists(sampler(), min_size=10))
-    # generate 'sentences' as a list of lists of tokens, easier to grab the tokens from that
-    sentences_lists = draw(
-        st.lists(
-            st.lists(st.sampled_from(candidate_corpus), min_size=1), min_size=5
-        )
-    )
-    corpus = {
-        token for sentence in sentences_lists for token in sentence
-    }  # set avoids duplication
-    sentences = [join_function(sentence) for sentence in sentences_lists]
-    return corpus, sentences
-
-
-@composite
-def default_vocab_strategy(
-    draw: DrawFn,
-) -> tuple[set[str], list[str], TokenizeFunction, JoinFunc]:
-    """Generate a corpus of tokens, sentences drawn from that corpus, a tokenizer, and a method of joining tokens according to the tokenizer."""
-    tokenizer, sampler, join_function = draw(tokenizer_method_generator())
-    corpus, sentences = draw(
-        corpus_and_sentences_generator(sampler, join_function)
-    )
-    return corpus, sentences, tokenizer, join_function
-
-
-def _test_vocab(corpus: set, vocab: dict[str, int]) -> None:
-    """Test assertions for vocab.
-
-    Helper function as these tests are repeated more often.
-    - Testing whether the vocab contains alls the tokens in the corpus
-    - Testing whether the length of the corpus is equal to the length
-      of the corpus (no redundant tokens)
-    - Testing whether the smallest value in the vocab is 0
-    - Testing whether all the values in the vocab are integers
-    - Testing whether the largest value in the vocab is less than or
-      equal to the length of the vocab
-    """
-    assert corpus == set(vocab.keys())
-    assert len(corpus) == len(vocab)
-    assert min(vocab.values()) == 0
-    assert set(map(type, vocab.values())) == {int}
-    assert max(vocab.values()) <= len(vocab)
-
-
-@given(data=default_vocab_strategy())
-def test_create_vocab(
-    data: tuple[set[str], list[str], TokenizeFunction, JoinFunc],
-) -> None:
-    """Test creation of vocab."""
-    corpus, sentences, tokenizer, _ = data
-    vocab = create_vocab(sentences, tokenizer)
-    _test_vocab(corpus, vocab)
-
-
-@given(data=default_vocab_strategy())
-def test_create_default_translator(
-    data: tuple[set[str], list[str], TokenizeFunction, JoinFunc],
-) -> None:
-    """Test creation of default translator.
-
-    - Testing whether all tokens in the sentences ended up in the translator vocab
-    - Testing whether the length of the translator is equal to the length of the corpus
-    - Testing whether encoding then decoding a sentence returns the original sentence
-    - Testing whether encoding results in lists of integers
-    """
-    corpus, sentences, tokenizer, join_function = data
-    translator = create_default_translator(sentences, tokenizer)
-
-    reverse_vocab = {
-        value: key for (key, value) in translator.vocab.items()
-    }  # reversing vocab to allow decoding
-
-    def decode(sentence: list[int]) -> str:
-        return join_function([reverse_vocab[num] for num in sentence])
-
-    assert corpus == set(translator.vocab.keys())  # set comparison
-    assert len(translator) == len(
-        corpus
-    )  # not entirely redundant since this also tests for ints
-    for sentence in sentences:
-        encoding = translator.encode(sentence)
-        assert (
-            decode(encoding) == sentence
-        )  # checking if reversing encoding restores the sentence
-        assert all(
-            isinstance(item, int) for item in encoding
-        )  # checking if encodings return integers
-
-
-# ---- Testing create_synonym_vocab() ----
-from sentence_similarity.translator import create_synonym_vocab  # noqa
-
-
-@composite
-def synonym_vocab_strategy(
-    draw: DrawFn,
-) -> tuple[set[str], list[str], list[tuple[str, ...]], TokenizeFunction]:
-    """Generate a corpus, sentences, synonyms and a tokenizer.
-
-    Synonyms are a single list[str] sampled from the corpus.
-    """
-    tokenizer, sampler, join_function = draw(tokenizer_method_generator())
-    corpus, sentences = draw(
-        corpus_and_sentences_generator(sampler, join_function)
-    )
-    assume(len(corpus) > 2)  # noqa
-    # filtering out corpuses that are too small since this can cause trouble when sampling synonyms
-    sample_corpus = sorted(corpus)
-    # this needs to be sorted to help hypothesis do the sampling
-    synonyms = tuple(
-        draw(
-            st.lists(
-                st.sampled_from(sample_corpus),
-                min_size=3,
-                max_size=5,
-                unique=True,
-            )
-        )
-    )  # randomly sample tokens from corpus to be synonyms
-
-    return corpus, sentences, [synonyms], tokenizer
-
-
-@given(data=synonym_vocab_strategy())
-def test_create_synonym_vocab(
-    data: tuple[set[str], list[str], list[tuple[str, ...]], TokenizeFunction],
-) -> None:
-    """Test create_synonym_vocab().
-
-    In addition to the standard vocab tests:
-     - Test whether all the synonyms from the single synonym list get the same value in the vocab.
-    """
-    corpus, sentences, synonyms, tokenizer = data
-    vocab = create_synonym_vocab(sentences, synonyms, tokenizer)  # type: ignore
-    _test_vocab(corpus, vocab)  # performing basic checks for vocabs
-    # checking if all synonyms in each list of synonyms have received the same value
-    for syn_list in synonyms:
-        assert (
-            len({vocab[syn] for syn in syn_list}) == 1
-        )  # if all values are the same, length of its set should be 1
-
-
-@composite
-def synonym_exception_strategy(
-    draw: DrawFn,
-) -> tuple[list[str], list[list[str]], TokenizeFunction]:
-    """Generate components for synomyms that should thrown an exception.
-
-    Generate a corpus of tokens, sentences consisting of tokens in the corpus, a tokenizer
-    and a set of synonyms that do not appear in the sentences,
-    to test whether create_synonym_vocab() correctly throws a ValueError.
-    """
-    corpus, sentences, tokenizer, _ = draw(default_vocab_strategy())
-
-    # generating new random word tokens that are (probably) not in the corpus
-    synonyms = draw(st.lists(word_generator(), min_size=2))
-    # making sure the new tokens are actually not in the corpus
-    assume(all(synonym not in corpus for synonym in synonyms))
-
-    return sentences, [synonyms], tokenizer
-
-
-@given(data=synonym_exception_strategy())
-def test_synonym_vocab_exception(
-    data: tuple[list[str], list[list[str]], TokenizeFunction],
-) -> None:
-    """Test whether create_synonym_vocab() correctly throws a value error when synonym tokens are provided that do not appear in the sentences."""
-    sentences, synonyms, tokenizer = data
-    with raises(ValueError):
-        create_synonym_vocab(sentences, synonyms, tokenizer)  # type: ignore
-
-
-# ---- Testing create_string_distance_vocab() ----
-from sentence_similarity.translator import create_string_distance_vocab  # noqa
-
-
-@composite
-def string_distance_vocab_strategy(
-    draw: DrawFn,
-) -> tuple[set[str], list[str], TokenizeFunction, int, list[tuple]]:
-    """Generate a corpus, distance, words within that distance, sentences and a tokenizer.
-
-    Words within distance are a list of tuples with word pairs within the distance.
-    """
-    # Creating a candidate corpus, a string distance,
-    # and extra words that get string distance applied
-    tokenizer, sampler, join_function = tokenizer_factory["on_spaces"]
-    candidate_corpus = draw(
-        st.lists(sampler(min_size=5), min_size=10, unique=True)
-    )
-    distance = draw(st.integers(min_value=2, max_value=4))
-    n_extra_words = draw(
-        st.integers(min_value=2, max_value=max(len(candidate_corpus) // 3, 2))
-    )
-    words_with_distance = draw(
-        st.lists(
-            st.sampled_from(candidate_corpus),
-            min_size=n_extra_words,
-            max_size=n_extra_words,
-        )
-    )
-
-    # list for storing word pairs, being the original word and the one with distance added
-    word_pairs = []
-    for i, word in enumerate(words_with_distance):
-        # only testing insertions, as testing substitutions and deletions
-        # is hard and essentially tests Levenshtein, not the vocab!
-        new_word = word + "a" * distance
-        word_pairs.append((word, new_word))
-        # replacing the original word with the distanced word
-        words_with_distance[i] = new_word
-
-    # updating the candidate corpus and sampling sentences from it
-    candidate_corpus = candidate_corpus + words_with_distance
-    sentences_lists = draw(
-        st.lists(
-            st.lists(st.sampled_from(candidate_corpus), min_size=1), min_size=5
-        )
-    )
-    corpus = {token for sentence in sentences_lists for token in sentence}
-    sentences = [join_function(sentence) for sentence in sentences_lists]
-
-    words_with_dist_in_corpus = [
-        word for word in corpus if word in words_with_distance
+def test_create_default_vocab() -> None:
+    """Test whether create_default_vocab given correct inputs generates."""
+    sentences = [
+        "Dit is een handmatige test",
+        "Dit is nodig omdat hypothesis stom doet",
+        "Dus dan maar een handmatige set zinnen",
     ]
-    # This makes sure there are distanced words used in the sentences
-    assume(len(words_with_dist_in_corpus) > 0)
-    # reconstructing word pairs from what is in sentences
-    word_pairs = {
-        (word, other_word)
-        for (word, other_word) in word_pairs
-        if (word in corpus and other_word in words_with_dist_in_corpus)
-    }
+    tokens = ["Dit", "is", "een", "handmatige"]
+    not_tokens = [
+        "test",
+        "nodig",
+        "omdat",
+        "hypothesis",
+        "stom",
+        "doet",
+        "Dus",
+        "dan",
+        "maar",
+        "set",
+        "zinnen",
+    ]
 
-    return corpus, sentences, tokenizer, distance, list(word_pairs)
+    vocab = create_default_vocab(sentences, tokenize_words)
+    for token in tokens:
+        assert token in vocab
+    for token in not_tokens:
+        assert token not in vocab
 
 
-@given(data=string_distance_vocab_strategy())
-def test_string_distance_vocab(
-    data: tuple[set[str], list[str], TokenizeFunction, int, list[tuple]],
-) -> None:
-    """Test create_string_distance_vocab().
+def test_create_default_vocab_exception() -> None:
+    """Test whether create_default_vocab raises an error if all tokens appear only once."""
+    sentences = ["alle woorden komen", "maar een keer voor"]
+    with pytest.raises(VocabUniqueTokensError):
+        create_default_vocab(sentences, tokenize_words)
 
-    In addition to the standard vocab tests:
-    - Test whether word pairs with a set distance between them get the same value in the vocab
-    """
-    corpus, sentences, tokenizer, distance, word_pairs = data
-    vocab = create_string_distance_vocab(sentences, distance, tokenizer)
-    _test_vocab(corpus, vocab)
-    # checking if all word pairs receive the same value from the vocab
-    for word, other_word in word_pairs:
-        assert vocab[word] == vocab[other_word]
+
+def test_create_synonym_vocab() -> None:
+    """Test whether create_synonym_vocab() given correct inputs generates."""
+    sentences = [
+        "Dit is een handmatige test",
+        "Dit is nodig omdat hypothesis stom doet",
+        "Dus dan maar een handmatige set zinnen",
+    ]
+    synonyms = [("Dus", "Dit"), ("test", "set"), ("hypothesis", "stom")]
+    tokens = [
+        "Dit",
+        "Dus",
+        "is",
+        "een",
+        "handmatige",
+        "test",
+        "set",
+        "hypothesis",
+        "stom",
+    ]
+    not_tokens = [
+        "nodig",
+        "omdat",
+        "doet",
+        "dan",
+        "maar",
+        "zinnen",
+    ]
+    vocab = create_synonym_vocab(sentences, synonyms, tokenize_words)
+    for token in tokens:
+        assert token in vocab
+    for token in not_tokens:
+        assert token not in vocab
+
+
+def test_string_distance_vocab() -> None:
+    """Test whether string distance vocab generates like it should."""
+    sentences = ["Dit is lastig", "Dus as anders", "Den vis boven"]
+    tokens = ["Dit", "Dus", "Den", "is", "as"]
+    not_tokens = ["lastig", "anders", "boven"]
+    vocab = create_string_distance_vocab(sentences, 3)
+    for token in tokens:
+        assert token in vocab
+    for token in not_tokens:
+        assert token not in vocab
+
+
+def test_string_distance_vocab_exception() -> None:
+    """Test whether string_distance_vocab() raises the correct exception when a non-metric string distance object is provided."""
+    sentences = ["Dit is lastig", "Dus as anders", "Den vis boven"]
+    with pytest.raises(StringDistanceVocabError):
+        create_string_distance_vocab(
+            sentences,
+            2,
+            distance_function=NormalizedLevenshtein(),  # type: ignore
+        )
+
+
+# ---- Test Translator
+
+
+@dataclass
+class TranslatorComponents:
+    """Components for testing Translator."""
+
+    tokenizer: TokenizeFunction
+    vocab: Vocab
+    vocab_length: int
+    sentence: str
+    numbers: list[int]
+
+
+@composite
+def translator_strategy(draw: DrawFn) -> TranslatorComponents:
+    """Draw from strategy for testing Translator."""
+    tokenizer = draw(st.sampled_from(TOKENIZERS))
+    tokens, sentence = draw(TOKENIZER_STRATEGY[tokenizer]())
+    vocab = {token: i for (i, token) in enumerate(tokens)}
+    vocab_length = len(tokens)
+    numbers = list(range(vocab_length))
+    return TranslatorComponents(
+        tokenizer, Vocab(vocab), vocab_length, sentence, numbers
+    )
+
+
+@given(comp=translator_strategy())
+def test_translator(comp: TranslatorComponents) -> None:
+    """Test whether Translator creation works as intended."""
+    translator = Translator(comp.tokenizer, comp.vocab)
+    assert len(translator) == comp.vocab_length
+    assert translator.encode(comp.sentence) == comp.numbers
