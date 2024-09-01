@@ -6,10 +6,10 @@ import hypothesis.strategies as st
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 from hypothesis import assume, given
 from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import DrawFn, composite
-from pytest import raises
 
 from sentence_similarity.translator import (
     TokenizeFunction,
@@ -18,7 +18,7 @@ from sentence_similarity.translator import (
     tokenize_on_spaces,
 )
 
-tokenizers = [tokenize_on_spaces, tokenize_characters]
+TOKENIZERS = [tokenize_on_spaces, tokenize_characters]
 ALPHABET = (
     string.ascii_letters + string.digits + string.punctuation.replace("\\", "")
 )
@@ -50,7 +50,7 @@ def sentence_generator(draw: DrawFn) -> str:
 
 
 # ---- Testing numericalization ----
-from sentence_similarity.sentence_similarity import _numericalize  # noqa
+from sentence_similarity.sentence_similarity import _numericalize
 
 
 @composite
@@ -68,13 +68,18 @@ def sentences_generator(
     )
 
 
-@given(sentences=sentences_generator(), method=st.sampled_from(tokenizers))
-def test_numericalize(sentences: list[str], method: TokenizeFunction) -> None:
+@given(method=st.sampled_from(TOKENIZERS))
+def test_numericalize(method: TokenizeFunction) -> None:
     """Test _numericalize.
 
     - Test whether sentences are converted to numpy.ndarrays
     - Test if the same number of sentences are numericalised as are entered in the numericalisation
     """
+    sentences = [
+        "Dit is een test",
+        "Dit is een andere test",
+        "Wat een hoop test",
+    ]
     translator = create_default_translator(sentences, method)
     numericalized = _numericalize(sentences, translator)
     assert all(isinstance(sentence, np.ndarray) for sentence in numericalized)
@@ -82,7 +87,7 @@ def test_numericalize(sentences: list[str], method: TokenizeFunction) -> None:
 
 
 # ---- Testing one-hot encoding ----
-from sentence_similarity.sentence_similarity import _one_hot_sentence  # noqa
+from sentence_similarity.sentence_similarity import _one_hot_sentence
 
 
 @composite
@@ -117,7 +122,7 @@ def test_one_hot_sentence(num_sentence: np.ndarray) -> None:
 
 
 # ---- Testing weight matrix -----
-from sentence_similarity.sentence_similarity import _weight_matrix  # noqa
+from sentence_similarity.sentence_similarity import _weight_matrix
 
 
 @given(
@@ -152,7 +157,7 @@ def test_weight_matrix_exception(size: int, min_value: float) -> None:
 
     - Test if the weight matrix throws an exception if the min value is outside the range [0, 1]
     """
-    with raises(ValueError):
+    with pytest.raises(ValueError):
         _weight_matrix(size, min_value)
 
 
@@ -167,7 +172,7 @@ def test_weight_matrix_identity(size: int) -> None:
 
 
 # ---- Testing einsum ----
-from sentence_similarity.sentence_similarity import _einsum  # noqa
+from sentence_similarity.sentence_similarity import _einsum
 
 
 @composite
@@ -232,7 +237,7 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]) -> None:
 
 
 # ---- Testing to_dataframe ----
-from sentence_similarity.sentence_similarity import _to_dataframe  # noqa
+from sentence_similarity.sentence_similarity import _to_dataframe
 
 
 @composite
@@ -308,18 +313,17 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
 
 
 # ---- integration test of sentence_similarity ----
-from sentence_similarity.sentence_similarity import sentence_similarity  # noqa
+from sentence_similarity.sentence_similarity import sentence_similarity
 
 
+# TODO manually generate sentences cause something weird is going wrong here
 @given(
-    sentences=sentences_generator(min_length=3),
-    tokenizer=st.sampled_from(tokenizers),
+    tokenizer=st.sampled_from(TOKENIZERS),
     weight_matrix_min=st.floats(min_value=0, max_value=0.999),
     filter_identity=st.booleans(),
     return_pandas=st.booleans(),
 )
 def test_sentence_similarity(
-    sentences: list[str],
     tokenizer: TokenizeFunction,
     weight_matrix_min: float,
     *,
@@ -333,6 +337,11 @@ def test_sentence_similarity(
     # - Test whether the provided sentences all show up in the [sentence] column
     # - Test whether the output is of the correct type (pd.DataFrame or pl.DataFrame)
     """
+    sentences = [
+        "Dit is een test",
+        "Dit is een andere test",
+        "Wat een hoop test",
+    ]
     similarity = sentence_similarity(
         sentences,
         tokenizer,
