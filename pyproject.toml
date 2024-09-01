@@ -33,7 +33,7 @@ select = [
     "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "RSE", "RET", "SLF",
     "SIM", "ARG", "FIX", "ERA", "PD", "PL", "TRY", "PERF", "RUF"
 ]
-ignore = ["ANN101", "PLR09", "D100", "D201", "D203", "D213", "F401"]
+ignore = ["ANN101", "PLR09", "D100", "D104", "D201", "D203", "D213", "F401"]
 
 [tool.ruff.format]
 quote-style = "double"
