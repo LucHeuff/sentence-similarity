@@ -1,4 +1,5 @@
 """Contains tests for translator.py."""
+
 import string
 from dataclasses import dataclass
 from itertools import chain

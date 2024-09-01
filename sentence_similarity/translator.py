@@ -1,4 +1,5 @@
 """Contains Translator, tokenizer and vocabulary functions to allow customisation of sentence similarity calculations."""
+
 import re
 from collections import Counter
 from typing import Callable, Iterator
