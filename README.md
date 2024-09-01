@@ -1,7 +1,7 @@
 # Sentence Similarity
 
 This package contains an algorithm which calculates a metric of comparability between a pair of sentences.
-The package allows for many sentneces to be compared amongst each other quickly (depending on available hardware).
+The package allows for many sentences to be compared amongst each other quickly (depending on available hardware).
 
 # Installation
 
@@ -32,9 +32,9 @@ The similarity score ranges from 0 when the two sentences have no tokens in comm
 to larger than 1 if one of the sentences is a subset of another sentence, or if tokens are repeated in either of the sentences.
 If sentences have some but not all tokens in common, or common tokens that are not in the same places in the sentence, the score is between 0 and 1.
 
-**Note** that 'similarity' should be interpreted as tokens directly matching between two sentences.
+> **Note** that 'similarity' should be interpreted as tokens directly matching between two sentences.
 The algorithm does not take synonyms into account out of the box (though you can add them manually with `create_synonym_vocab`)
-and the algorithm is not smart enough to know when sentences mean the same thing in different languages
+and the algorithm is not smart enough to know when sentences mean the same thing, either in different styles or in different languages
 ("That car is red" and "Die auto is rood" will compare to a score of 0, since they have no words in common).
 
 # Customization
@@ -51,14 +51,13 @@ The package contains three tokenizers:
   token (For example, `'What?!'` is tokenized as `['What', '?', '!']`).
 - `tokenize_on_spaces`: splits the sentence on spaces, giving punctuation no special treatment (`'What the?!'` is tokenized as `['What', 'the?!']`).
 - `tokenize_characters`: splits each character into a separate token. May be useful when comparing identification codes
-  instead of sentences. Note that different from the other methods, whitespaces receive their own token!
+  instead of sentences. **Note** that different from the other methods, whitespaces receive their own token!
 
 If these tokenizers do not suit your needs, you can also provide your own:
 
 ```
 def custom_tokenizer(sentence: str) -> list[str]:
-    # your code goes here
-    return tokens
+    ...
 ```
 
 and pass it into the main function using `sentence_similarity(sentences, tokenizer=custom_tokenizer)`.
@@ -67,10 +66,10 @@ By default, `sentence_similarity(sentences)` will use the `tokenize_words` token
 
 ## Translator
 
-The Translator is a simple class that performs the translation by first tokenizing the sentence and
-then passing it through a translation vocabulary. On initialisation, the Translator will also perform
+The Translator is a simple class that performs the translation into numbers by first tokenizing the sentence and
+then encoding it through a translation vocabulary. On initialisation, the Translator will also perform
 some checks on the vocabulary that are intended to optimise performance.
-For instance, the smallest value in the vocab **must be 0**, and the largest value of the vocab **must be equal to its length**.
+
 The sentence similarity algorithm uses matrices to calculate the similarity score, and these requirements makes
 sure that these matrices do not get any larger than they need to be.
 
@@ -78,7 +77,7 @@ sure that these matrices do not get any larger than they need to be.
 It will split the sentences using the provided tokenizer (`tokenize_words` if you don't provide any), and
 will create a vocabulary from all those tokens.
 
-If you want to use a different vocabulary, you can use the `create_translator(tokenizer, vocab)` convenience function
+If you want to use a different vocabulary, you can use the `create_translator(vocab, tokenizer)` convenience function
 to create a custom Translator and pass it into the main function using `sentence_similarity(sentences, translator=custom_translator)`.
 
 Depending on the vocabulary generation method, the creation of the Translator can be very timeconsuming. In this case it
@@ -87,12 +86,18 @@ This can be especially helpful if the `sentence_similarity` function is called m
 
 ## Vocabularies
 
-A vocabulary is simply a dictionary which translates strings into an integers: `dict[str, int]`. Any such dictionary
-can be used, so you can provide your own, as long as the **smallest integer is 0** and **the largest integer is equal to the lenght of the dictionary** (see above),
+A vocabulary uses a dictionary which translates strings into an integers: `dict[str, int]`. Any such dictionary
+can be used, so you can provide your own, as long it adheres to the following rules: 
+
+- the smallest value in the vocab **must be 0**
+- the values **must be consecutive** (though not necessarily unique)
+> Values being consecutive means that there should be no gaps in the numbers, because this will waste memory and performance.
+This means that a vocabulary of `{"zero": 0, "one": 1, "two": 2}` is valid, and so is `{"hey": 0, "there": 1, "yonder": 1}`.
+However, a vocabulary of `{"vocab": 0, "is": 2, "invalid": 4}` is invalid.
 
 The package contains three methods of creating vocabularies:
 
-- `create_vocab(sentences, tokenizer)`:  
+- `create_default_vocab(sentences, tokenizer)`:  
   splits all sentences into tokens based on a provided `tokenizer` and gives each token a unique integer value.
 - `create_synonym_vocab(sentences, synonyms, tokenizer)`:  
   allows you to additionally pass in a list of tuples, where each tuple contains all the words that are synonyms of each other
@@ -100,9 +105,13 @@ The package contains three methods of creating vocabularies:
   Each token in a set of synonyms is translated to the same integer value.
 - `create_string_distance_vocab(sentences, distance, tokenizer, distance_function)`:  
   allows for tokens that are within `distance` from each other based on some `distance_function` to be translated to the same integer value.
-  The `distance_function` is assumed to be a `StringDistance` function from the [`strsimpy`](https://github.com/luozhouyang/python-string-similarity) package (defaults to `Levenshtein`).
+  The `distance_function` is assumed to be a `MetricStringDistance` from the [`strsimpy`](https://github.com/luozhouyang/python-string-similarity) package (defaults to `Levenshtein`).
   This can be useful when there may be typo's in your sentences.
-  **Note** that string distances can take a while to calculate!
+  > **Note** that string distances can take a while to calculate!
+
+If these vocabularies do not suit your needs, you can provide your own dictionary `dict[str, int]` following the rules above,
+and use the `create_vocab(your_dictionary)` convenience function to generate a valid vocabulary object.
+These can then be used to create a Translator using `create_translator(vocab, tokenizer)`.
 
 ## Weight matrix
 
@@ -112,4 +121,4 @@ along the way. The minimum value at the edges can be customised by setting the `
 `sentence_similarity(sentences, weight_matrix_min=0.5)`. Setting this value will change how the score responds to tokens that match
 between sentences but are in different places. Setting the value to 1. disables discounting entirely.    
 If you alternatively want to ignore any tokens that are not in exactly the same position between the two sentences, you can use `sentence_similarity(sentences, weight_matrix_min='identity')` instead,
-which will set the weight matrix to an identity matrix.
+which will set the weight matrix to the identity matrix.
