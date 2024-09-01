@@ -27,10 +27,10 @@ for _ in range(N):
 
 result = np.asarray(times)
 
-print(" ---- BENCHMARK ----")
-print(f"Average time: {result.mean():.3f} ± {result.std():.3f} s\n\n")
+print(" ---- BENCHMARK ----")  # noqa: T201
+print(f"Average time: {result.mean():.3f} ± {result.std():.3f} s\n")  # noqa: T201
 
-print(" ---- PROFILE ----")
+print(" ---- PROFILE ----")  # noqa: T201
 
 # Profiling
 PROFILE = True
