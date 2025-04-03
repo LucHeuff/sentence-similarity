@@ -9,6 +9,19 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given
 from hypothesis.strategies import DrawFn, composite
+from sentence_similarity.translator import (
+    StringDistanceVocabError,
+    TokenizeFunction,
+    Translator,
+    Vocab,
+    VocabUniqueTokensError,
+    create_default_vocab,
+    create_string_distance_vocab,
+    create_synonym_vocab,
+    tokenize_characters,
+    tokenize_on_spaces,
+    tokenize_words,
+)
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 PUNCTUATION = r"%&'*+,-./:;=?@^`|~"
@@ -27,9 +40,7 @@ Sampler = Callable[[], st.SearchStrategy[str]]
 @composite
 def character_generator(draw: DrawFn) -> str:
     """Generate a single character, including WHITESPACE."""
-    return draw(
-        st.text(ALPHABET + WHITESPACE + PUNCTUATION, min_size=1, max_size=1)
-    )
+    return draw(st.text(ALPHABET + WHITESPACE + PUNCTUATION, min_size=1, max_size=1))
 
 
 @composite
@@ -45,19 +56,6 @@ def punctuation_generator(draw: DrawFn) -> str:
 
 
 # ---- Testing tokenizer functions ----
-from sentence_similarity.translator import (
-    StringDistanceVocabError,
-    TokenizeFunction,
-    Translator,
-    Vocab,
-    VocabUniqueTokensError,
-    create_default_vocab,
-    create_string_distance_vocab,
-    create_synonym_vocab,
-    tokenize_characters,
-    tokenize_on_spaces,
-    tokenize_words,
-)
 
 
 @composite
@@ -65,7 +63,7 @@ def tokenize_on_spaces_strategy(draw: DrawFn) -> tuple[list[str], str]:
     """Generate a set of words and combines those words into a sentence with a WHITESPACE.
 
     Allows testing whether tokenization correctly recovers the words that went into the sentence.
-    """
+    """  # noqa: E501
     words = draw(st.lists(word_generator(), min_size=1, unique=True))
     sentence = " ".join(words)
     return words, sentence
@@ -73,7 +71,7 @@ def tokenize_on_spaces_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
 @given(data=tokenize_on_spaces_strategy())
 def test_tokenize_on_spaces(data: tuple[list[str], str]) -> None:
-    """Test whether tokenizing on spaces returns the words that went into the sentence."""
+    """Test whether tokenizing on spaces returns the words that went into the sentence."""  # noqa: E501
     words, sentence = data
     assert tokenize_on_spaces(sentence) == words
 
@@ -83,7 +81,7 @@ def tokenize_character_strategy(draw: DrawFn) -> tuple[list[str], str]:
     """Generate a set of characters and combines these characters into a sentence by pasting them together directly.
 
     Allows testing whether tokenization correctly recovers the characters that went into the sentence.
-    """
+    """  # noqa: E501
     characters = draw(st.lists(character_generator(), min_size=1, unique=True))
     sentence = "".join(characters)
     return characters, sentence
@@ -91,7 +89,7 @@ def tokenize_character_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
 @given(data=tokenize_character_strategy())
 def test_tokenize_characters(data: tuple[list[str], str]) -> None:
-    """Test whether tokenizing on characters returns the charactes that went into the sentence."""
+    """Test whether tokenizing on characters returns the charactes that went into the sentence."""  # noqa: E501
     characters, sentence = data
     # testing whether the tokenizer returns each character
     assert tokenize_characters(sentence) == characters
@@ -117,7 +115,7 @@ def tokenize_words_strategy(draw: DrawFn) -> tuple[list[str], str]:
     tokens = list(chain(*zip(words, punctuation)))
     # making a list of tokens where the punctuation is pasted right behind the word
     tokens_into_sentence = [
-        "".join([word, punct]) for (word, punct) in zip(words, punctuation)
+        f"{word}{punct}" for (word, punct) in zip(words, punctuation)
     ]
     sentence = " ".join(tokens_into_sentence)
     return tokens, sentence
@@ -125,7 +123,7 @@ def tokenize_words_strategy(draw: DrawFn) -> tuple[list[str], str]:
 
 @given(data=tokenize_words_strategy())
 def test_tokenize_words(data: tuple[list[str], str]) -> None:
-    """Test whether tokenizing on words returns the words and punctuation that went into the sentence."""
+    """Test whether tokenizing on words returns the words and punctuation that went into the sentence."""  # noqa: E501
     tokens, sentence = data
     assert tokenize_words(sentence) == tokens
 
@@ -152,7 +150,7 @@ def vocab_strategy(draw: DrawFn) -> VocabComponents:
     ----
         draw: hypothesis draw function
 
-    Returns:
+    Returns
     -------
         VocabComponents for test
 
@@ -188,7 +186,7 @@ def test_vocab(comp: VocabComponents) -> None:
         # checking if __contains__ works as intended.
         # concatenating all tokens and adding a character since that should
         # never randomly appear in the vocab.
-        assert not "".join(comp.vocab.keys()) + "a" in vocab
+        assert "".join(comp.vocab.keys()) + "a" not in vocab
 
 
 TOKENIZERS = [tokenize_words, tokenize_characters, tokenize_on_spaces]
@@ -230,7 +228,7 @@ def test_create_default_vocab() -> None:
 
 
 def test_create_default_vocab_exception() -> None:
-    """Test whether create_default_vocab raises an error if all tokens appear only once."""
+    """Test whether create_default_vocab raises an error if all tokens appear only once."""  # noqa: E501
     sentences = ["alle woorden komen", "maar een keer voor"]
     with pytest.raises(VocabUniqueTokensError):
         create_default_vocab(sentences, tokenize_words)
@@ -283,13 +281,13 @@ def test_string_distance_vocab() -> None:
 
 
 def test_string_distance_vocab_exception() -> None:
-    """Test whether string_distance_vocab() raises the correct exception when a non-metric string distance object is provided."""
+    """Test whether string_distance_vocab() raises the correct exception when a non-metric string distance object is provided."""  # noqa: E501
     sentences = ["Dit is lastig", "Dus as anders", "Den vis boven"]
     with pytest.raises(StringDistanceVocabError):
         create_string_distance_vocab(
             sentences,
             2,
-            distance_function=NormalizedLevenshtein(),  # type: ignore
+            distance_function=NormalizedLevenshtein(),  # pyright: ignore[reportArgumentType]
         )
 
 

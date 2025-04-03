@@ -1,47 +1,19 @@
-[tool.poetry]
+[project]
 name = "sentence-similarity"
-version = "1.3.0"
-description = "Algorithm for fast comparison of string sentences"
-authors = ["Luc Heuff <lucheuff@hotmail.com>"]
-license = "MIT"
+version = "0.1.0"
+description = "Add your description here"
 readme = "README.md"
-packages = [{include = "sentence_similarity"}]
-
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^1.25.2"
-strsimpy = "^0.2.1"
-polars = "^0.20.31"
-pyarrow = "^16.1.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.2"
-hypothesis = "^6.84.3"
-neovim = "^0.3.1"
-ruff = "^0.2.2"
-ipython = "^8.21.0"
-poetry2setup = "^1.1.0"
-pandas = "^2.2.2"
-
-[tool.ruff]
-line-length = 80
-output-format = 'concise'
-
-[tool.ruff.lint]
-select = [
-    "F", "C90", "I", "N", "D", "ANN", "BLE", "FBT", "B", "A", "C4", "EM",
-    "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "RSE", "RET", "SLF",
-    "SIM", "ARG", "FIX", "ERA", "PD", "PL", "TRY", "PERF", "RUF"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.2.4",
+    "polars>=1.26.0",
+    "pyarrow>=19.0.1",
+    "strsimpy>=0.2.1",
 ]
-ignore = ["ANN101", "PLR09", "D100", "D104", "D201", "D203", "D213", "F401"]
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-docstring-code-format = true
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-
+[dependency-groups]
+dev = [
+    "basedpyright>=1.28.4",
+    "hypothesis>=6.130.7",
+    "pytest>=8.3.5",
+]

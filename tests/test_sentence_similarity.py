@@ -5,14 +5,21 @@ import string
 
 import hypothesis.strategies as st
 import numpy as np
-import pandas as pd
 import polars as pl
 import pytest
 from hypothesis import assume, given
 from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import DrawFn, composite
 from polars.testing import assert_frame_equal
-
+from sentence_similarity.sentence_similarity import (
+    InvalidWeightMatrixError,
+    _einsum,
+    _numericalize,
+    _one_hot_sentence,
+    _to_dataframe,
+    _weight_matrix,
+    sentence_similarity,
+)
 from sentence_similarity.translator import (
     TokenizeFunction,
     create_default_translator,
@@ -52,10 +59,6 @@ def sentence_generator(draw: DrawFn) -> str:
 
 
 # ---- Testing numericalization ----
-from sentence_similarity.sentence_similarity import (
-    InvalidWeightMatrixError,
-    _numericalize,
-)
 
 
 @composite
@@ -79,7 +82,7 @@ def test_numericalize(method: TokenizeFunction) -> None:
 
     - Test whether sentences are converted to numpy.ndarrays
     - Test if the same number of sentences are numericalised as are entered in the numericalisation
-    """
+    """  # noqa: E501
     sentences = [
         "Dit is een test",
         "Dit is een andere test",
@@ -92,7 +95,6 @@ def test_numericalize(method: TokenizeFunction) -> None:
 
 
 # ---- Testing one-hot encoding ----
-from sentence_similarity.sentence_similarity import _one_hot_sentence
 
 
 @composite
@@ -114,22 +116,19 @@ def test_one_hot_sentence(num_sentence: np.ndarray) -> None:
 
     - Test if the one-hot-encoded matrix has dimensions of (vocab_length, max_sentence_length)
     - Test if the correct index in each column is one-hot-encoded
-    """
+    """  # noqa: E501
     vocab_length = (
         num_sentence.max() + 1
     )  # making sure that if the sentence is [0] this is interpreted as a length of 1
     max_sentence_length = num_sentence.size
 
-    encoded, _ = _one_hot_sentence(
-        num_sentence, vocab_length, max_sentence_length
-    )
+    encoded, _ = _one_hot_sentence(num_sentence, vocab_length, max_sentence_length)
 
     assert encoded.shape == (vocab_length, max_sentence_length)
     assert np.array_equal(num_sentence, encoded.argmax(axis=0))
 
 
 # ---- Testing weight matrix -----
-from sentence_similarity.sentence_similarity import _weight_matrix
 
 
 @given(
@@ -163,7 +162,7 @@ def test_weight_matrix_exception(size: int, min_value: float) -> None:
     """Test if _weight_matrix() throws correct exception.
 
     - Test if the weight matrix throws an exception if the min value is outside the range [0, 1]
-    """
+    """  # noqa: E501
     with pytest.raises(InvalidWeightMatrixError):
         _weight_matrix(size, min_value)
 
@@ -179,7 +178,6 @@ def test_weight_matrix_identity(size: int) -> None:
 
 
 # ---- Testing einsum ----
-from sentence_similarity.sentence_similarity import _einsum
 
 
 @composite
@@ -202,7 +200,7 @@ def numbered_sentences_generator(
 
 @composite
 def einsum_strategy(draw: DrawFn) -> tuple[list[np.ndarray], int, int]:
-    """Generate a list of numbered sentences, a vocab length and a sentence length for testing einsum calculations."""
+    """Generate a list of numbered sentences, a vocab length and a sentence length for testing einsum calculations."""  # noqa: E501
     vocab_length = draw(st.integers(min_value=1, max_value=30))
     sentence_length = draw(st.integers(min_value=2, max_value=30))
     sentences = draw(
@@ -216,7 +214,8 @@ def einsum_strategy(draw: DrawFn) -> tuple[list[np.ndarray], int, int]:
     return sentences, vocab_length + 1, sentence_length
 
 
-# somewhat more of an integeration test but generating the right tensors is really annoying
+# somewhat more of an integeration test
+# but generating the right tensors is really annoying
 @given(einsum_strategy())
 def test_einsum(data: tuple[list[np.ndarray], int, int]) -> None:
     """Test _einsum.
@@ -245,13 +244,12 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]) -> None:
 
 
 # ---- Testing to_dataframe ----
-from sentence_similarity.sentence_similarity import _to_dataframe
 
 
 @composite
 def dataframe_strategy(
     draw: DrawFn,
-) -> tuple[list[str], np.ndarray, bool, bool]:
+) -> tuple[list[str], np.ndarray, bool]:
     """Generate fake einsum output that can be converted to a dataframe.
 
     Allows testing whether the right values also end up in the right places
@@ -267,33 +265,26 @@ def dataframe_strategy(
         )
     )
     identity = draw(st.booleans())
-    pandas = draw(st.booleans())
-    return sents, data, identity, pandas
+    return sents, data, identity
 
 
 @given(dataframe_strategy())
-def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
+def test_to_dataframe(data: tuple[list[str], np.ndarray, bool]) -> None:
     """Test _to_dataframe().
 
     - Test whether the correct columns are present
     - Test whether all the sentences are present in both [sentence] and [other_sentence] columns
     - Test whether similarity scores end up in the correct place
-    - Test whether correctly returns pandas.DataFrame or polars.DataFrame
-    """
-    sentences, similarity, identity, pandas = data
+    """  # noqa: E501
+    sentences, similarity, identity = data
 
-    sdf = _to_dataframe(
-        sentences, similarity, filter_identity=identity, return_pandas=pandas
-    )
+    sdf = _to_dataframe(sentences, similarity, filter_identity=identity)
 
     assert set(sdf.columns) == {"sentence", "other_sentence", "similarity"}
     assert set(sentences) == set(sdf["sentence"].unique())
     assert set(sentences) == set(sdf["other_sentence"].unique())
 
-    if pandas:
-        assert isinstance(sdf, pd.DataFrame)
-    else:
-        assert isinstance(sdf, pl.DataFrame)
+    assert isinstance(sdf, pl.DataFrame)
 
     # checking whether values have ended up in the right place
     indices = list(range(len(sentences)))
@@ -302,40 +293,28 @@ def test_to_dataframe(data: tuple[list[str], np.ndarray, bool, bool]) -> None:
             continue
         sentence = sentences[i]
         other_sentence = sentences[j]
-        if pandas:
-            assert (
-                sdf.loc[  # type: ignore
-                    (sdf.sentence == sentence)  # type: ignore
-                    & (sdf.other_sentence == other_sentence)  # type: ignore
-                ].similarity.item()
-                == similarity[i, j]
-            )
-        else:
-            assert (
-                sdf.filter(  # type: ignore
-                    (pl.col("sentence") == pl.lit(sentence))
-                    & (pl.col("other_sentence") == pl.lit(other_sentence))
-                )["similarity"].item()
-                == similarity[i, j]
-            )
+        assert (
+            sdf.filter(
+                (pl.col("sentence") == pl.lit(sentence))
+                & (pl.col("other_sentence") == pl.lit(other_sentence))
+            )["similarity"].item()
+            == similarity[i, j]
+        )
 
 
 # ---- integration test of sentence_similarity ----
-from sentence_similarity.sentence_similarity import sentence_similarity
 
 
 @given(
     tokenizer=st.sampled_from(TOKENIZERS),
     weight_matrix_min=st.floats(min_value=0, max_value=0.999),
     filter_identity=st.booleans(),
-    return_pandas=st.booleans(),
 )
 def test_sentence_similarity(
     tokenizer: TokenizeFunction,
     weight_matrix_min: float,
     *,
     filter_identity: bool,
-    return_pandas: bool,
 ) -> None:
     """Test sentence_similarity.
 
@@ -354,13 +333,9 @@ def test_sentence_similarity(
         tokenizer,
         weight_matrix_min=weight_matrix_min,
         filter_identity=filter_identity,
-        return_pandas=return_pandas,
     )
 
-    if return_pandas:
-        assert isinstance(similarity, pd.DataFrame)
-    else:
-        assert isinstance(similarity, pl.DataFrame)
+    assert isinstance(similarity, pl.DataFrame)
 
     assert set(similarity["sentence"].unique()) == set(
         similarity["other_sentence"].unique()
@@ -379,6 +354,4 @@ def test_sentence_similarity_outcomes() -> None:
         }
     )
     ss = sentence_similarity(sentences)
-    assert_frame_equal(
-        ss, out_df, check_row_order=False, check_column_order=False
-    )
+    assert_frame_equal(ss, out_df, check_row_order=False, check_column_order=False)  # pyright: ignore[reportArgumentType]

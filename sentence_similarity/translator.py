@@ -1,8 +1,8 @@
-"""Contains Translator, tokenizer and vocabulary functions to allow customisation of sentence similarity calculations."""
+"""Contains Translator, tokenizer and vocabulary functions to allow customisation of sentence similarity calculations."""  # noqa: E501
 
 import re
 from collections import Counter
-from typing import Callable, Iterator
+from typing import Callable, Iterator  # noqa: UP035
 
 from strsimpy.levenshtein import Levenshtein
 from strsimpy.string_distance import MetricStringDistance
@@ -23,7 +23,7 @@ def tokenize_words(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns:
+    Returns
     -------
         list of string tokens
 
@@ -40,7 +40,7 @@ def tokenize_on_spaces(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns:
+    Returns
     -------
         list of string tokens
 
@@ -55,7 +55,7 @@ def tokenize_characters(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns:
+    Returns
     -------
         list of string tokens
 
@@ -80,14 +80,14 @@ class Vocab:
                    NOTE: Smallest integer must be 0, and integer values must be consecutive
                    (but don't have to be ordered).
 
-        """
+        """  # noqa: E501
         # validation checks
         assert vocab, "There are no tokens in the vocab."
         assert min(vocab.values()) == 0, "Smallest integer in vocab must be 0."
         vocab_max = max(vocab.values())
-        assert (
-            sum(set(vocab.values())) == vocab_max * (vocab_max + 1) / 2
-        ), "Integer values are not consecutive."
+        assert sum(set(vocab.values())) == vocab_max * (vocab_max + 1) / 2, (
+            "Integer values are not consecutive."
+        )
         self.vocab = vocab
 
     def __getitem__(self, token: str) -> int | None:
@@ -119,12 +119,12 @@ class Translator:
             vocab: a vocabulary that translates unique tokens into integers
                    Note that the lowest allowed value is 0, and integer values must be consecutive!
 
-        """
+        """  # noqa: E501
         self.tokenize = tokenizer
         self.vocab = vocab
 
     def encode(self, sentence: str) -> list[int | None]:
-        """Encode each word in the sentence if it appears in the vocab, resulting in list of integers."""
+        """Encode each word in the sentence if it appears in the vocab, resulting in list of integers."""  # noqa: E501
         return [self.vocab[token] for token in self.tokenize(sentence)]
 
     def __len__(self) -> int:
@@ -146,11 +146,11 @@ def create_default_translator(
         tokenizer: function with which to perform
                                    tokenization. Defaults to tokenize_words.
 
-    Returns:
+    Returns
     -------
         Translator: object to perform translation from sentences to numericalised lists.
 
-    """
+    """  # noqa: E501
     vocab = create_default_vocab(sentences, tokenizer)
     return Translator(tokenizer, vocab)
 
@@ -167,11 +167,11 @@ def create_translator(
                (but don't have to be ordered).
         tokenizer: the desired tokenizer for the translator
 
-    Returns:
+    Returns
     -------
         A Translator instance using the provided tokenizer and vocab
 
-    """
+    """  # noqa: E501
     return Translator(tokenizer, create_vocab(vocab))
 
 
@@ -187,11 +187,11 @@ def create_vocab(vocab: dict[str, int]) -> Vocab:
                NOTE: Smallest integer must be 0, and integer values must be consecutive
                (but don't have to be ordered).
 
-    Returns:
+    Returns
     -------
        Vocab constructed from provided vocabulary
 
-    """
+    """  # noqa: E501
     return Vocab(vocab)
 
 
@@ -203,7 +203,7 @@ def _tokenize_sentence(sentence: str, tokenizer: TokenizeFunction) -> set[str]:
         sentence: str containing text to be tokenized
         tokenizer: method of tokenizing
 
-    Returns:
+    Returns
     -------
        set of unique tokens in this sentence
 
@@ -221,7 +221,7 @@ def _create_token_counter(
         sentences: list of strings containing the sentences to be compared
         tokenizer: method of tokenizing
 
-    Returns:
+    Returns
     -------
         Counter object with token counts.
 
@@ -249,25 +249,23 @@ def _get_vocab_tokens(counter: Counter) -> list[str]:
     ----
         counter: Counter object containing tokens and counts.
 
-    Returns:
+    Returns
     -------
        list of tokens appearing more than once
 
-    Raises:
+    Raises
     ------
         VocabUniqueTokensError: When all tokens appear only once
 
     """
     vocab_tokens = [token for (token, number) in counter.items() if number > 1]
     if not vocab_tokens:
-        message = "All tokens appear only once in the corpus, there is no similarity to calculate."
+        message = "All tokens appear only once in the corpus, there is no similarity to calculate."  # noqa: E501
         raise VocabUniqueTokensError(message)
     return vocab_tokens
 
 
-def create_default_vocab(
-    sentences: list[str], tokenizer: TokenizeFunction
-) -> Vocab:
+def create_default_vocab(sentences: list[str], tokenizer: TokenizeFunction) -> Vocab:
     """Create a vocabulary dictionary which pairs each unique token in the sentences with a unique integer.
 
     Args:
@@ -275,11 +273,11 @@ def create_default_vocab(
         sentences: list of sentences in the form of strings
         tokenizer: function that performs tokenization on sentences.
 
-    Returns:
+    Returns
     -------
         Vocab from sentences
 
-    """
+    """  # noqa: E501
     counter = _create_token_counter(sentences, tokenizer)
     vocab_tokens = _get_vocab_tokens(counter)
     return create_vocab({token: i for (i, token) in enumerate(vocab_tokens)})
@@ -301,16 +299,17 @@ def create_synonym_vocab(
                                      all the words that are synonyms of each other
         tokenizer: function that performs tokenization on sentences.
 
-    Returns:
+    Returns
     -------
         Vocab from sentences and synonyms
 
     """
     counter = _create_token_counter(sentences, tokenizer)
 
-    # update the Counter to make sure I don't remove tokens for which synonyms do appear
+    # update the Counter to make sure
+    # I don't remove tokens for which synonyms do appear
     for synonym_set in synonyms:
-        # taking the sum of all appearences of synonyms and setting that into the counter
+        # taking the sum of all appearences of synonyms and setting that to counter
         token_sum = sum(counter[sym] for sym in synonym_set if sym in counter)
         for syn in synonym_set:
             counter[syn] = token_sum
@@ -334,7 +333,8 @@ def create_synonym_vocab(
         if token not in all_synonyms:
             tokens_list.append({token})
 
-    # enumerating tokens list into dictionary, making sure synonyms get the same token
+    # enumerating tokens list into dictionary,
+    # making sure synonyms get the same token
     return create_vocab(
         {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens}
     )
@@ -348,7 +348,7 @@ def create_string_distance_vocab(
     sentences: list[str],
     distance: int,
     tokenizer: TokenizeFunction = tokenize_words,
-    distance_function: MetricStringDistance = Levenshtein(),  # noqa: B008
+    distance_function: MetricStringDistance | None = None,
 ) -> Vocab:
     """Create a vocabulary dictionary which pairs tokens to integers.
 
@@ -362,20 +362,23 @@ def create_string_distance_vocab(
         tokenizer: Function that performs tokenization on sentences. Defaults to tokenize_words.
         distance_function: strsimpy MetricStringDistance subclass to measure string distance. Defaults to Levenshtein().
 
-    Returns:
+    Returns
     -------
         dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
 
-    """
+    """  # noqa: E501
+    if distance_function is None:
+        distance_function = Levenshtein()
     if not isinstance(distance_function, MetricStringDistance):
-        message = f"distance_function must be a MetricStringDistance, which '{type(distance_function)}' is not."
+        message = f"distance_function must be a MetricStringDistance, which '{type(distance_function)}' is not."  # noqa: E501
         raise StringDistanceVocabError(message)
 
     counter = _create_token_counter(sentences, tokenizer)
 
-    # Calculating distance metrics if often costly, so I want to avoid repeating calculations.
+    # Calculating distance metrics if often costly,
+    # so I want to avoid repeating calculations.
     # By requiring the distance_function to be a metric, we know it is symmetric.
-    # This means that if I find tokens that are similar to token a on the same distance metric,
+    # This means that if I find tokens that are similar on the same distance metric,
     # I don't have to calculate the reverse again.
     # Hence making sets for seen and unseen, in an attempt to improve performance.
     unseen_tokens = set(counter)
@@ -385,7 +388,8 @@ def create_string_distance_vocab(
         # ignoring tokens we have already seen
         if token in seen_tokens:
             continue
-        # creating a set of tokens that are within the distance threshold for this token
+        # creating a set of tokens that are within the distance threshold
+        # for this token
         close_tokens = {token} | {
             other_token
             for other_token in unseen_tokens
@@ -393,7 +397,8 @@ def create_string_distance_vocab(
         }
         # calculating how often these appear combined in the counter
         token_sum = sum(counter[close] for close in close_tokens)
-        # pass on updating counter and close_sets if this set of tokens (could just be token!)
+        # pass on updating counter and close_sets if this set of tokens
+        # (could just be token!)
         # does not appear more than once in total in the corpus
         if token_sum > 1:
             # updating the counter for each of the close tokens

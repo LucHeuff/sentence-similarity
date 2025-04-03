@@ -11,17 +11,10 @@ The package can be installed using `pip`:
 pip install git+https://github.com/LucHeuff/sentence-similarity.git
 ```
 
-or using [`poetry`](https://python-poetry.org/):
+or using [`uv`](https://docs.astral.sh/uv/):
 
 ```
-poetry install git+https://github.com/LucHeuff/sentence-similarity.git
-```
-
-or by adding it to `pyproject.toml`:
-
-```
-[tool.poetry.dependencies]
-sentence-similarity = { git = "https://github.com/LucHeuff/sentence-similarity.git" }
+uv add git+https://github.com/LucHeuff/sentence-similarity.git
 ```
 
 # How does it work?
@@ -31,6 +24,12 @@ possible combinations of `sentences` (which needs to be a list of strings).
 The similarity score ranges from 0 when the two sentences have no tokens in common, to 1 if the sentences exactly match,
 to larger than 1 if one of the sentences is a subset of another sentence, or if tokens are repeated in either of the sentences.
 If sentences have some but not all tokens in common, or common tokens that are not in the same places in the sentence, the score is between 0 and 1.
+
+Similarity scores between all sentences are returned as a `polars` dataframe. 
+If you are used to working with `pandas` instead, the output of `sentence_similarity()` can be converted using `.to_pandas()`.
+
+By default, similarity scores comparing the sentence with itself is omitted (as this is tautologically 1), but these can be restored using
+the argument `filter_identity=False`.
 
 > **Note** that 'similarity' should be interpreted as tokens directly matching between two sentences.
 The algorithm does not take synonyms into account out of the box (though you can add them manually with `create_synonym_vocab`)

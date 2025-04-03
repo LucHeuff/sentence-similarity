@@ -27,7 +27,7 @@ class Translator(Protocol):
 
 
 class DuplicateSentencesError(Exception):
-    """Raised when some of the sentences passed into sentence_similarity() are duplicated."""
+    """Raised when some of the sentences passed into sentence_similarity() are duplicated."""  # noqa: E501
 
 
 class InvalidWeightMatrixError(Exception):
@@ -44,7 +44,6 @@ def sentence_similarity(
     weight_matrix_min: float | str = 0.1,
     *,
     filter_identity: bool = True,
-    return_pandas: bool = False,
 ) -> pl.DataFrame:
     """Calculate similarity among provided sentences.
 
@@ -63,7 +62,7 @@ def sentence_similarity(
         filter_identity: whether cases where the sentence is compared to itself should be filtered out.
         return_pandas: whether to return a pandas.DataFrame. Defaults to returning a polars.DataFrame.
 
-    Returns:
+    Returns
     -------
         A dataframe with columns (sentence, other_sentence, score) containing the paired
         sentences and the calculated similarity score.
@@ -72,11 +71,11 @@ def sentence_similarity(
         A score between 0 and 1 is a measure for the similarity between the two sentences
         A score larger than 1 indicates that some tokens are repeated in one or both sentences.
 
-    Raises:
+    Raises
     ------
         ValueError: if a string is passed into weight_matrix_min that is not 'identity'.
 
-    """
+    """  # noqa: E501
     if len(sentences) != len(set(sentences)):
         message = "[sentences] is not unique, some sentences are duplicated."
         raise DuplicateSentencesError(message)
@@ -94,7 +93,7 @@ def sentence_similarity(
     if weight_matrix_min == "identity":
         weight_matrix = _weight_matrix(max_sentence_length, identity=True)
     elif isinstance(weight_matrix_min, str):
-        message = f"weight_matrix_min should be float or 'identity', got {weight_matrix_min}"
+        message = f"weight_matrix_min should be float or 'identity', got {weight_matrix_min}"  # noqa: E501
         raise InvalidWeightMatrixError(message)
     else:
         weight_matrix = _weight_matrix(max_sentence_length, weight_matrix_min)
@@ -115,13 +114,10 @@ def sentence_similarity(
         sentences,
         similarity,
         filter_identity=filter_identity,
-        return_pandas=return_pandas,
     )
 
 
-def _numericalize(
-    sentences: list[str], translator: Translator
-) -> list[np.ndarray]:
+def _numericalize(sentences: list[str], translator: Translator) -> list[np.ndarray]:
     return [np.asarray(translator.encode(sentence)) for sentence in sentences]
 
 
@@ -143,26 +139,27 @@ def _one_hot_sentence(
                                  This makes sure all matrices are of the same size,
                                  padded with zeros when shorter.
 
-    Returns:
+    Returns
     -------
         np.ndarray: Matrix encoding of the sentence. Note that when term frequencies are applied,
                     the matrix can take any value between 0. and 1.
 
-    """
+    """  # noqa: E501
     # Determining the weight of words, in case they occur more than once.
     # Weighting by 1/sqrt(n) such that the similarity score still adds up to 1
     # even if words appear multiple times in the encoding products
     # Setting to 0 if the word is None, using 1 / inf = 0
 
     counter = Counter(sentence)
-    counter[None] = np.inf  # pyright: ignore
+    counter[None] = np.inf  # pyright: ignore[reportArgumentType]
 
     values = [1 / np.sqrt(counter[word]) for word in sentence]
-    # calculating max possible score. This is the square of values plus 1 for every None
-    max_score = np.power(values, 2).sum() + (sentence == None).sum()
+    # calculating max possible score.
+    # This is the square of values plus 1 for every None
+    max_score = np.power(values, 2).sum() + (sentence == None).sum()  # noqa: E711
 
     # replacing None occurrences with 1, these will be set to 0 anyway
-    sentence[sentence == None] = 1
+    sentence[sentence == None] = 1  # noqa: E711
     sentence = sentence.astype(int)
 
     index = np.arange(len(sentence))
@@ -170,7 +167,7 @@ def _one_hot_sentence(
     # building the one-hot matrix
     one_hot = np.zeros((vocab_length, max_sentence_length))
 
-    # replacing indices given from the numericalised sentences with the required value
+    # replacing indices from the numericalised sentences with the required value
     one_hot[sentence, index] = values
 
     return one_hot, max_score
@@ -193,28 +190,26 @@ def _weight_matrix(
                  Defaults to 0.1.
         identity: sets the weight matrix to an identity matrix of shape (size, size)
 
-    Returns:
+    Returns
     -------
         the weight matrix
 
-    Raises:
+    Raises
     ------
         ValueError: When [minimum] is not between 0. and 1.
 
 
-    """
+    """  # noqa: E501
     if identity:
         return np.eye(size)
     if not 0 <= minimum <= 1:
-        message = f"""You are trying to set a minimum value for the weight matrix of {minimum}, which is outside the range [0., 1.]."""
+        message = f"""You are trying to set a minimum value for the weight matrix of {minimum}, which is outside the range [0., 1.]."""  # noqa: E501
         raise InvalidWeightMatrixError(message)
 
     size_range = np.arange(size)
     linear_space = np.linspace(1, minimum, num=size)
 
-    weights = sum(
-        np.eye(size, k=n) * s for n, s in zip(size_range, linear_space)
-    )
+    weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))  # pyright: ignore[reportCallIssue, reportArgumentType]
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
 
     assert weight_matrix.shape == (
@@ -241,11 +236,11 @@ def _einsum(
         weight_matrix: weight matrix of shape (sentences, sentences)
         max_scores: vector of maximum possible scores for each sentence
 
-    Returns:
+    Returns
     -------
         np.ndarray: similarity scores of shape (sentences, sentences)
 
-    """
+    """  # noqa: E501
     # einsum to calculate the similarity scores for all sentences amongst each other
     return np.einsum(
         "mij, nik, jk, n -> mn",
@@ -262,7 +257,6 @@ def _to_dataframe(
     similarity: np.ndarray,
     *,
     filter_identity: bool = True,
-    return_pandas: bool = False,
 ) -> pl.DataFrame:
     """Construct a pandas.DataFrame containing the combination of each pair of sentences with their similarity scores.
 
@@ -271,14 +265,13 @@ def _to_dataframe(
         sentences: list of sentences that were compared to each other using _einsum()
         similarity: output of _einsum()
         filter_identity: whether to remove rows where sentence is equal to other_sentence. Default: True.
-        return_pandas: whether to return a pandas Dataframe. Defaults to returning a polars dataframe.
 
-    Returns:
+    Returns
     -------
         pd.DataFrame: dataframe consisting of sentence pair columns named 'sentence'
                     and 'other_sentence' with their similarity score in 'similarity'
 
-    """
+    """  # noqa: E501
     # polars variant
 
     sdf = (
@@ -294,7 +287,4 @@ def _to_dataframe(
     if filter_identity:
         sdf = sdf.filter(pl.col("sentence") != pl.col("other_sentence"))
 
-    if return_pandas:
-        sdf = sdf.to_pandas()
-
-    return sdf  # type: ignore
+    return sdf
