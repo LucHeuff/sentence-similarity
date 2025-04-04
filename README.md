@@ -35,6 +35,8 @@ the argument `filter_identity=False`.
 The algorithm does not take synonyms into account out of the box (though you can add them manually with `create_synonym_vocab`)
 and the algorithm is not smart enough to know when sentences mean the same thing, either in different styles or in different languages
 ("That car is red" and "Die auto is rood" will compare to a score of 0, since they have no words in common).
+In addition, the similarity is not a *distance*, as the similarity score of sentence a with b is not necessarily the same as the score for b with a.
+For example, "this is a short sentence" can have a higher similarity score to "this is a much longer sentence with more words" than the other way around.
 
 # Customization
 
