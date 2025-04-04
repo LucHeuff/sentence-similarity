@@ -151,6 +151,7 @@ def _one_hot_sentence(
     # Setting to 0 if the word is None, using 1 / inf = 0
 
     counter = Counter(sentence)
+    # setting Counter[None] to infinity, so sqrt(infinity) = 0
     counter[None] = np.inf  # pyright: ignore[reportArgumentType]
 
     values = [1 / np.sqrt(counter[word]) for word in sentence]
@@ -276,6 +277,7 @@ def _to_dataframe(
 
     sdf = (
         pl.from_numpy(similarity, schema=sentences)
+        .lazy()
         .with_columns(sentence=pl.Series(sentences))
         .melt(
             id_vars="sentence",
@@ -287,4 +289,4 @@ def _to_dataframe(
     if filter_identity:
         sdf = sdf.filter(pl.col("sentence") != pl.col("other_sentence"))
 
-    return sdf
+    return sdf.collect()
