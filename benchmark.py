@@ -4,14 +4,14 @@ from pstats import Stats
 from time import perf_counter
 
 import numpy as np
-
+import polars as pl
 from sentence_similarity import sentence_similarity
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
-import pandas as pd
 
-bench = pd.read_csv("bench.csv").drop_duplicates()
+bench = pl.scan_csv("omschrijving.csv").unique().collect()
+sentences = bench["omschrijving"].to_list()
 
 # Benchmarking
 
@@ -21,7 +21,7 @@ times = []
 
 for _ in range(N):
     start = perf_counter()
-    sentence_similarity(bench.omschrijving.tolist())
+    sentence_similarity(sentences)
     end = perf_counter()
     times.append(end - start)
 
@@ -37,5 +37,5 @@ PROFILE = True
 
 if PROFILE:
     with cProfile.Profile() as profiler:
-        sentence_similarity(bench.omschrijving.tolist())
+        sentence_similarity(sentences)
         Stats(profiler).strip_dirs().sort_stats("cumulative").print_stats(20)
