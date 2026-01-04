@@ -1,4 +1,5 @@
 """Provides package interface."""
+# ruff: noqa: F401
 
 from sentence_similarity.sentence_similarity import (
     Translator,

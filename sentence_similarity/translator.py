@@ -23,7 +23,7 @@ def tokenize_words(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns
+    Returns:
     -------
         list of string tokens
 
@@ -40,7 +40,7 @@ def tokenize_on_spaces(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns
+    Returns:
     -------
         list of string tokens
 
@@ -55,7 +55,7 @@ def tokenize_characters(sentence: str) -> list[str]:
     ----
         sentence: string to be separated into tokens
 
-    Returns
+    Returns:
     -------
         list of string tokens
 
@@ -146,7 +146,7 @@ def create_default_translator(
         tokenizer: function with which to perform
                                    tokenization. Defaults to tokenize_words.
 
-    Returns
+    Returns:
     -------
         Translator: object to perform translation from sentences to numericalised lists.
 
@@ -167,7 +167,7 @@ def create_translator(
                (but don't have to be ordered).
         tokenizer: the desired tokenizer for the translator
 
-    Returns
+    Returns:
     -------
         A Translator instance using the provided tokenizer and vocab
 
@@ -187,7 +187,7 @@ def create_vocab(vocab: dict[str, int]) -> Vocab:
                NOTE: Smallest integer must be 0, and integer values must be consecutive
                (but don't have to be ordered).
 
-    Returns
+    Returns:
     -------
        Vocab constructed from provided vocabulary
 
@@ -203,7 +203,7 @@ def _tokenize_sentence(sentence: str, tokenizer: TokenizeFunction) -> set[str]:
         sentence: str containing text to be tokenized
         tokenizer: method of tokenizing
 
-    Returns
+    Returns:
     -------
        set of unique tokens in this sentence
 
@@ -221,7 +221,7 @@ def _create_token_counter(
         sentences: list of strings containing the sentences to be compared
         tokenizer: method of tokenizing
 
-    Returns
+    Returns:
     -------
         Counter object with token counts.
 
@@ -249,11 +249,11 @@ def _get_vocab_tokens(counter: Counter) -> list[str]:
     ----
         counter: Counter object containing tokens and counts.
 
-    Returns
+    Returns:
     -------
        list of tokens appearing more than once
 
-    Raises
+    Raises:
     ------
         VocabUniqueTokensError: When all tokens appear only once
 
@@ -273,7 +273,7 @@ def create_default_vocab(sentences: list[str], tokenizer: TokenizeFunction) -> V
         sentences: list of sentences in the form of strings
         tokenizer: function that performs tokenization on sentences.
 
-    Returns
+    Returns:
     -------
         Vocab from sentences
 
@@ -299,7 +299,7 @@ def create_synonym_vocab(
                                      all the words that are synonyms of each other
         tokenizer: function that performs tokenization on sentences.
 
-    Returns
+    Returns:
     -------
         Vocab from sentences and synonyms
 
@@ -362,7 +362,7 @@ def create_string_distance_vocab(
         tokenizer: Function that performs tokenization on sentences. Defaults to tokenize_words.
         distance_function: strsimpy MetricStringDistance subclass to measure string distance. Defaults to Levenshtein().
 
-    Returns
+    Returns:
     -------
         dict[str, int]: vocabulary dictionary with tokens (str) keys and int values
 

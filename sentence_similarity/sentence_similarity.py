@@ -62,7 +62,7 @@ def sentence_similarity(
         filter_identity: whether cases where the sentence is compared to itself should be filtered out.
         return_pandas: whether to return a pandas.DataFrame. Defaults to returning a polars.DataFrame.
 
-    Returns
+    Returns:
     -------
         A dataframe with columns (sentence, other_sentence, score) containing the paired
         sentences and the calculated similarity score.
@@ -71,7 +71,7 @@ def sentence_similarity(
         A score between 0 and 1 is a measure for the similarity between the two sentences
         A score larger than 1 indicates that some tokens are repeated in one or both sentences.
 
-    Raises
+    Raises:
     ------
         ValueError: if a string is passed into weight_matrix_min that is not 'identity'.
 
@@ -139,7 +139,7 @@ def _one_hot_sentence(
                                  This makes sure all matrices are of the same size,
                                  padded with zeros when shorter.
 
-    Returns
+    Returns:
     -------
         np.ndarray: Matrix encoding of the sentence. Note that when term frequencies are applied,
                     the matrix can take any value between 0. and 1.
@@ -152,7 +152,7 @@ def _one_hot_sentence(
 
     counter = Counter(sentence)
     # setting Counter[None] to infinity, so sqrt(infinity) = 0
-    counter[None] = np.inf  # pyright: ignore[reportArgumentType]
+    counter[None] = np.inf  # ty:ignore[invalid-assignment]
 
     values = [1 / np.sqrt(counter[word]) for word in sentence]
     # calculating max possible score.
@@ -191,11 +191,11 @@ def _weight_matrix(
                  Defaults to 0.1.
         identity: sets the weight matrix to an identity matrix of shape (size, size)
 
-    Returns
+    Returns:
     -------
         the weight matrix
 
-    Raises
+    Raises:
     ------
         ValueError: When [minimum] is not between 0. and 1.
 
@@ -237,7 +237,7 @@ def _einsum(
         weight_matrix: weight matrix of shape (sentences, sentences)
         max_scores: vector of maximum possible scores for each sentence
 
-    Returns
+    Returns:
     -------
         np.ndarray: similarity scores of shape (sentences, sentences)
 
@@ -267,7 +267,7 @@ def _to_dataframe(
         similarity: output of _einsum()
         filter_identity: whether to remove rows where sentence is equal to other_sentence. Default: True.
 
-    Returns
+    Returns:
     -------
         pd.DataFrame: dataframe consisting of sentence pair columns named 'sentence'
                     and 'other_sentence' with their similarity score in 'similarity'

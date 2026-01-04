@@ -150,7 +150,7 @@ def vocab_strategy(draw: DrawFn) -> VocabComponents:
     ----
         draw: hypothesis draw function
 
-    Returns
+    Returns:
     -------
         VocabComponents for test
 
@@ -287,7 +287,7 @@ def test_string_distance_vocab_exception() -> None:
         create_string_distance_vocab(
             sentences,
             2,
-            distance_function=NormalizedLevenshtein(),  # pyright: ignore[reportArgumentType]
+            distance_function=NormalizedLevenshtein(),  # ty: ignore[invalid-argument-type]
         )
 
 
