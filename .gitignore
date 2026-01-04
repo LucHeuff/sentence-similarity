@@ -5,8 +5,12 @@ __pycache__
 .mypy_cache
 dist
 
+# dev stuff
+dev.py
+
 # file format
 *.code-workspace
 *.ipynb
 *.csv
 *.lock
+*.coverage
