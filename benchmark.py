@@ -1,41 +1,48 @@
-import cProfile
-import warnings
+from collections.abc import Callable
+from cProfile import Profile
+from pathlib import Path
 from pstats import Stats
-from time import perf_counter
 
-import numpy as np
-import polars as pl
+from faker import Faker
 from sentence_similarity import sentence_similarity
 
-warnings.simplefilter("ignore", DeprecationWarning)
+
+def profile(function: Callable) -> None:
+    """Profile a function."""
+    with Profile() as profiler:
+        function()
+        Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(20)
 
 
-bench = pl.scan_csv("omschrijving.csv").unique().collect()
-sentences = bench["omschrijving"].to_list()
+def fake_sentences(n: int = 3000) -> None:
+    """Create fake sentences and store these into 'fake.txt'."""
+    fake = Faker()
+    words = fake.words(80)
+    sentences = [
+        fake.sentence(15, variable_nb_words=True, ext_word_list=words)
+        for _ in range(n)
+    ]
+    with Path("fake.txt").open("w") as file:
+        file.write("\n".join(sentences))
 
-# Benchmarking
 
-N = 10
+def benchmark() -> None:
+    """Run a benchmark on 'fake.csv'."""
+    sentences = Path("fake.txt").read_text().splitlines()
 
-times = []
-
-for _ in range(N):
-    start = perf_counter()
-    sentence_similarity(sentences)
-    end = perf_counter()
-    times.append(end - start)
-
-result = np.asarray(times)
-
-print(" ---- BENCHMARK ----")  # noqa: T201
-print(f"Average time: {result.mean():.3f} ± {result.std():.3f} s\n")  # noqa: T201
-
-print(" ---- PROFILE ----")  # noqa: T201
-
-# Profiling
-PROFILE = True
-
-if PROFILE:
-    with cProfile.Profile() as profiler:
+    def run() -> None:
         sentence_similarity(sentences)
-        Stats(profiler).strip_dirs().sort_stats("cumulative").print_stats(20)
+
+    profile(run)
+
+
+def main() -> None:
+    """Main runner."""
+    benchmark()
+
+
+if __name__ == "__main__":
+    import subprocess
+
+    subprocess.run("clear", check=True, shell=True)
+    main()
