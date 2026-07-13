@@ -109,6 +109,14 @@ class Vocab:
         """Get the length of the vocab."""
         return max(self.vocab.values()) + 1
 
+    def __repr__(self) -> str:
+        """Vocab in a readable form."""
+        return (
+            "Vocab(\n "
+            + "\n ".join([f"{k}: {v}" for k, v in self.vocab.items()])
+            + "\n)"
+        )
+
 
 class Translator:
     """Base class for Translators."""
@@ -133,6 +141,10 @@ class Translator:
     def __len__(self) -> int:
         """Return the length of the Translator."""
         return len(self.vocab)
+
+    def __repr__(self) -> str:
+        """Print vocab for this translator."""
+        return repr(self.vocab)
 
 
 #  ---- Translator factories
