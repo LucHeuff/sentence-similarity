@@ -231,7 +231,7 @@ def test_einsum(data: tuple[list[np.ndarray], int, int]) -> None:
         _one_hot_sentence(sentence, vocab_length, sentence_length)
         for sentence in sentences
     ]
-    one_hot_sentences, max_scores = list(zip(*one_hot_encodings))
+    one_hot_sentences, max_scores = list(zip(*one_hot_encodings, strict=False))
     tensor = np.stack(one_hot_sentences)
     weight_matrix = _weight_matrix(size=sentence_length, minimum=0.2)
 
@@ -354,4 +354,4 @@ def test_sentence_similarity_outcomes() -> None:
         }
     )
     ss = sentence_similarity(sentences)
-    assert_frame_equal(ss, out_df, check_row_order=False, check_column_order=False)  # pyright: ignore[reportArgumentType]
+    assert_frame_equal(ss, out_df, check_row_order=False, check_column_order=False)

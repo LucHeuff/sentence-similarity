@@ -1,11 +1,14 @@
-"""Contains Translator, tokenizer and vocabulary functions to allow customisation of sentence similarity calculations."""  # noqa: E501
-
 import re
 from collections import Counter
 from typing import Callable, Iterator  # noqa: UP035
 
 from strsimpy.levenshtein import Levenshtein
 from strsimpy.string_distance import MetricStringDistance
+
+from sentence_similarity.exceptions import (
+    StringDistanceVocabError,
+    VocabUniqueTokensError,
+)
 
 TokenizeFunction = Callable[[str], list[str]]
 
@@ -238,10 +241,6 @@ def _create_token_counter(
     return Counter(tokens)
 
 
-class VocabUniqueTokensError(Exception):
-    """Used when all tokens for the vocab appear only once in the corpus."""
-
-
 def _get_vocab_tokens(counter: Counter) -> list[str]:
     """Retrieve all tokens that occur in the vocab more than once.
 
@@ -338,10 +337,6 @@ def create_synonym_vocab(
     return create_vocab(
         {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens}
     )
-
-
-class StringDistanceVocabError(Exception):
-    """Raised when the distance function is not a MetricStringDistance."""
 
 
 def create_string_distance_vocab(

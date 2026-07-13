@@ -7,6 +7,10 @@ from typing import Protocol
 import numpy as np
 import polars as pl
 
+from sentence_similarity.exceptions import (
+    DuplicateSentencesError,
+    InvalidWeightMatrixError,
+)
 from sentence_similarity.translator import (
     TokenizeFunction,
     create_default_translator,
@@ -24,14 +28,6 @@ class Translator(Protocol):
     def __len__(self) -> int:
         """Return the length of the vocabulary of the translator."""
         ...
-
-
-class DuplicateSentencesError(Exception):
-    """Raised when some of the sentences passed into sentence_similarity() are duplicated."""  # noqa: E501
-
-
-class InvalidWeightMatrixError(Exception):
-    """Raised when input to generate a weight matrix is invalid."""
 
 
 EINSUM_OPT = "optimal"
@@ -104,7 +100,7 @@ def sentence_similarity(
         max_sentence_length=max_sentence_length,
     )
     one_hot_encodings = [one_hot_encode(sentence) for sentence in num_sentences]
-    one_hot_sentences, max_scores = list(zip(*one_hot_encodings))
+    one_hot_sentences, max_scores = list(zip(*one_hot_encodings, strict=False))
 
     one_hot_tensor = np.stack(one_hot_sentences)
 
@@ -210,7 +206,9 @@ def _weight_matrix(
     size_range = np.arange(size)
     linear_space = np.linspace(1, minimum, num=size)
 
-    weights = sum(np.eye(size, k=n) * s for n, s in zip(size_range, linear_space))  # pyright: ignore[reportCallIssue, reportArgumentType]
+    weights = sum(
+        np.eye(size, k=n) * s for n, s in zip(size_range, linear_space, strict=False)
+    )
     weight_matrix = np.triu(weights) + np.triu(weights).T - np.eye(size)
 
     assert weight_matrix.shape == (
