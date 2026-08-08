@@ -45,8 +45,6 @@ def sentence_similarity(
 
         filter_identity: whether cases where the sentence is compared to itself
                          should be filtered out.
-        return_pandas: whether to return a pandas.DataFrame.
-                       Defaults to returning a polars.DataFrame.
 
     Returns:
     -------
@@ -180,9 +178,7 @@ def _weight_matrix(size: int, base: float, *, identity: bool = False) -> np.ndar
 
 
 def _einsum(
-    tensor: np.ndarray,
-    norms: np.ndarray,
-    weight_matrix: np.ndarray,
+    tensor: np.ndarray, norms: np.ndarray, weight_matrix: np.ndarray
 ) -> np.ndarray:
     """Calculate similarity among sentences.
 
@@ -202,9 +198,8 @@ def _einsum(
         np.ndarray: similarity scores of shape (sentences, sentences)
 
     """
-    norm = 1 / np.sqrt(
-        norms.T @ norms
-    )  # should result in norm product for each sentence
+    # should result in norm product for each sentence
+    norm = 1 / np.sqrt(norms.T @ norms)
 
     return np.einsum(
         "mij, nik, jk, mn -> mn",

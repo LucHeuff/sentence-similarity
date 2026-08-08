@@ -38,6 +38,7 @@ def benchmark() -> None:
 
 def main() -> None:
     """Main runner."""
+    fake_sentences(3000)
     benchmark()
 
 
