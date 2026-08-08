@@ -12,7 +12,6 @@ from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import DrawFn, composite
 from polars.testing import assert_frame_equal
 from sentence_similarity.sentence_similarity import (
-    InvalidWeightMatrixError,
     _einsum,
     _numericalize,
     _one_hot_sentence,

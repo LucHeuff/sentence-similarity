@@ -104,11 +104,6 @@ The package contains three methods of creating vocabularies:
   allows you to additionally pass in a list of tuples, where each tuple contains all the words that are synonyms of each other
   (e.g. `[('motor', 'engine'), ('car', 'van', 'SUV'), ...]`)
   Each token in a set of synonyms is translated to the same integer value.
-- `create_string_distance_vocab(sentences, distance, tokenizer, distance_function)`:  
-  allows for tokens that are within `distance` from each other based on some `distance_function` to be translated to the same integer value.
-  The `distance_function` is assumed to be a `MetricStringDistance` from the [`strsimpy`](https://github.com/luozhouyang/python-string-similarity) package (defaults to `Levenshtein`).
-  This can be useful when there may be typo's in your sentences.
-  > **Note** that string distances can take a while to calculate!
 
 If these vocabularies do not suit your needs, you can provide your own dictionary `dict[str, int]` following the rules above,
 and use the `create_vocab(your_dictionary)` convenience function to generate a valid vocabulary object.
