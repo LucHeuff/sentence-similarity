@@ -352,7 +352,7 @@ def test_sentence_similarity_outcomes() -> None:
 
 
 def test_sentence_similarity_raises_duplicate() -> None:
-    """Test whether sentence similarity raises the correct exception upon duplicates."""
+    """Test whether sentence similarity raises the correct exception."""
     sentences = ["exact hetzelfde", "exact hetzelfde", "bijna hetzelfde"]
     with pytest.raises(DuplicateSentencesError):
         sentence_similarity(sentences)

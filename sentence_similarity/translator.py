@@ -1,5 +1,5 @@
 import re
-from typing import Callable, Iterator, Sequence  # noqa: UP035
+from typing import Callable, Sequence  # noqa: UP035
 
 TokenizeFunction = Callable[[str], list[str]]
 
