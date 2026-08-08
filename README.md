@@ -112,7 +112,7 @@ These can then be used to create a Translator using `create_translator(vocab, to
 ## Weight matrix
 
 The algorithm uses a 'weight matrix' in order to discount tokens that match but are not in the same position in the sentence.
-By default, the weight matrix ranges from 1 on the diagonal and scaling down exponentiall by $base^distance$ on off-diagonals (where the first diagonal off center has $distance=1$, etc.).
+By default, the weight matrix ranges from 1 on the diagonal and scaling down exponentiall by $base^{distance}$ on off-diagonals (where the first diagonal off center has $distance=1$, etc.).
 The base value can be changed by setting the `weight_matrix_base` value to a float larger than 0, for example:
 `sentence_similarity(sentences, weight_matrix_base=0.5)`. Setting this value will change how the score responds to tokens that match
 between sentences but are in different places. Setting the value to 1. disables discounting entirely.    
