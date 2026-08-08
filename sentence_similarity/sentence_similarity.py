@@ -1,7 +1,6 @@
 """Contains sentence similarity main function and algorithm."""
 
 from functools import partial
-from typing import Protocol
 
 import numpy as np
 import polars as pl
@@ -16,19 +15,6 @@ from sentence_similarity.translator import (
     create_default_vocab,
     tokenize_words,
 )
-
-
-class Translator(Protocol):
-    """Protocol class for translator methods."""
-
-    def encode(self, sentence: str) -> list[int | None]:
-        """Translate a string sentence into a list of integers."""
-        ...
-
-    def __len__(self) -> int:
-        """Return the length of the vocabulary of the translator."""
-        ...
-
 
 EINSUM_OPT = "optimal"
 
@@ -145,12 +131,6 @@ def _one_hot_sentence(
 
     """
     index = np.arange(len(sentence))
-
-    # removing None from the sentence, and removing their indices
-    if None in sentence:
-        mask = sentence != None  # noqa: E711
-        sentence = sentence[mask].astype(int)  # can only index with int, not object
-        index = index[mask]
 
     # building the one-hot matrix
     one_hot = np.zeros((vocab_length, max_sentence_length))

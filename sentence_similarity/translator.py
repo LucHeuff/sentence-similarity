@@ -88,10 +88,6 @@ class Vocab:
         """Get the value for this token."""
         return self.vocab.get(token, None)
 
-    def __iter__(self) -> Iterator[int]:
-        """Get an iterator over vocab values."""
-        yield from self.vocab.values()
-
     def __contains__(self, token: str) -> bool:
         """Return whether vocab contains this token."""
         return token in self.vocab
@@ -207,32 +203,30 @@ def create_synonym_vocab(
     """
     vocab = _default_vocab(sentences, tokenizer)
 
-    # update the Counter to make sure
-    # I don't remove tokens for which synonyms do appear
-    for synonym_set in synonyms:
-        # taking the sum of all appearences of synonyms and setting that to counter
-        token_sum = sum(vocab[sym] for sym in synonym_set if sym in vocab)
-        for syn in synonym_set:
-            vocab[syn] = token_sum
+    # keeping track of all synonyms that exist
+    all_synonyms = {syn for syn_set in synonyms for syn in syn_set}
 
-    # reducing synonyms to sets of synonyms that appear in vocab_tokens
-    synonym_sets = []
-    for synonym_set in synonyms:
-        if all(syn not in vocab for syn in synonym_set):
+    # creating a list of lists in which tokens that get the same value
+    # go in the same list
+    tokens_list = []
+    for syn_set in synonyms:
+        # avoid appending an empty list if none of the synonyms in the set appear
+        # in the vocab
+        if all(syn not in vocab for syn in syn_set):
             continue
-        synonym_appear_set = {syn for syn in synonym_set if syn in vocab}
-        synonym_sets.append(synonym_appear_set)
+        tokens_list.append([syn for syn in syn_set if syn in vocab])
 
-    all_synonyms = [syn for synonym_set in synonym_sets for syn in synonym_set]
-
-    tokens_list = synonym_sets.copy()  # copy list of synonyms into a new list
-    # add extracted tokens if they are not in the list already
     for token in vocab:
-        if token not in all_synonyms:
-            tokens_list.append({token})
+        if token in all_synonyms:
+            continue
+        tokens_list.append([token])
 
-    # enumerating tokens list into dictionary,
-    # making sure synonyms get the same token
-    return Vocab(
+    synonym_vocab = Vocab(
         {token: i for (i, tokens) in enumerate(tokens_list) for token in tokens}
     )
+
+    assert len(synonym_vocab.vocab) == len(vocab), (
+        "Vocabs should have the same number of tokens"
+    )
+
+    return synonym_vocab

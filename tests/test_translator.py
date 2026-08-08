@@ -236,6 +236,19 @@ def test_create_synonym_vocab(s: SynonymVocabStrategy) -> None:
     )
 
 
+def test_create_synonym_vocab_no_overlap() -> None:
+    """Test whether synonyms that don't appear in sentences are correctly ignored."""
+    sentences = [
+        "This is a test for synonyms",
+        "That might not appear in the vocab",
+        "Because people can make mistakes you know",
+    ]
+    tokens = list({word for sentence in sentences for word in sentence.split()})
+    synonyms = [("This", "That", "There"), ("1", "2", "3")]
+    vocab = create_synonym_vocab(sentences, synonyms, tokenize_words)
+    assert all(token in vocab for token in tokens)
+
+
 # ---- Test Translator
 
 

@@ -36,3 +36,18 @@ def sentence(draw: DrawFn, min_size: int = 1, max_size: int = 10) -> str:
     return " ".join(
         draw(st.lists(word(), min_size=min_size, max_size=max_size, unique=True))
     )
+
+
+@composite
+def numbered_sentence(
+    draw: DrawFn,
+    max_value: int,
+    size: int = 10,
+) -> tuple[int, ...]:
+    """Generate a single sentence consisting of numbers."""
+    numbers = draw(
+        st.lists(
+            st.integers(0, max_value), min_size=size, max_size=size, unique=True
+        )
+    )
+    return tuple(numbers)
