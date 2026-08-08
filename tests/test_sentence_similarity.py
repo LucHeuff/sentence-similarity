@@ -116,7 +116,7 @@ def test_weight_matrix(size: int, base: float) -> None:
 @given(
     size=st.integers(min_value=2, max_value=10),
     # generating floats outside of the range [0, 1]
-    base=st.floats().filter(lambda x: not 0.0 <= x <= 1.0),
+    base=st.floats(max_value=0),
 )
 def test_weight_matrix_exception(size: int, base: float) -> None:
     """Test if _weight_matrix() throws correct exception.

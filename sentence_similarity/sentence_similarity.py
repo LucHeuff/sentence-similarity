@@ -158,15 +158,15 @@ def _weight_matrix(size: int, base: float, *, identity: bool = False) -> np.ndar
 
     Raises:
     ------
-        ValueError: When [minimum] is not between 0. and 1.
+        ValueError: When [base] is not larger than 0
 
 
     """  # noqa: E501
     if identity:
         return np.eye(size)
 
-    if not 0 < base <= 1:
-        msg = f"Base should be on domain (0, 1], but got {base}"
+    if base <= 0:
+        msg = f"Base should be larger than 0, but got {base}"
         raise InvalidWeightBaseError(msg)
 
     i = np.asarray([np.arange(size)])
